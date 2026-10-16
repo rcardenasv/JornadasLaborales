@@ -2,7 +2,7 @@ package com.assessment.employees.application.usecase;
 
 import com.assessment.employees.application.dto.EmployeeResult;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
-import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 
 /**
@@ -15,11 +15,10 @@ public class GetEmployee {
         this.repository = repository;
     }
     
-    public EmployeeResult execute(String id) {
-        EmployeeId employeeId = new EmployeeId(java.util.UUID.fromString(id));
-        
-        return repository.findById(employeeId)
+    public EmployeeResult execute(String documentType, String documentNumber) {
+        Document document = Document.of(documentType, documentNumber);
+        return repository.findByDocument(document)
             .map(EmployeeResult::fromDomain)
-            .orElseThrow(() -> new EmployeeNotFoundException(employeeId));
+            .orElseThrow(() -> new EmployeeNotFoundException(document));
     }
 }

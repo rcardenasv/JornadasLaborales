@@ -2,6 +2,7 @@ package com.assessment.employees.infrastructure.config;
 
 import com.assessment.employees.application.usecase.CreateEmployee;
 import com.assessment.employees.application.usecase.CreateWorkShift;
+import com.assessment.employees.application.usecase.BulkCreateWorkShifts;
 import com.assessment.employees.application.usecase.DeleteEmployee;
 import com.assessment.employees.application.usecase.DeleteWorkShift;
 import com.assessment.employees.application.usecase.GetEmployee;
@@ -57,6 +58,13 @@ public class UseCaseConfig {
     public CreateWorkShift createWorkShift(WorkShiftRepository workShiftRepository,
                                            EmployeeRepository employeeRepository) {
         return new CreateWorkShift(workShiftRepository, employeeRepository);
+    }
+
+    @Produces
+    @ApplicationScoped
+    public BulkCreateWorkShifts bulkCreateWorkShifts(WorkShiftRepository workShiftRepository,
+                                                      EmployeeRepository employeeRepository) {
+        return new BulkCreateWorkShifts(workShiftRepository, employeeRepository);
     }
     
     @Produces

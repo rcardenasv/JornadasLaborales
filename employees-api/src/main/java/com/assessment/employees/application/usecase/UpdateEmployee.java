@@ -4,8 +4,9 @@ import com.assessment.employees.application.dto.EmployeeResult;
 import com.assessment.employees.application.dto.UpdateEmployeeCommand;
 import com.assessment.employees.domain.exception.DuplicateEmployeeException;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
+import com.assessment.employees.domain.exception.InvalidEmployeeDataException;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.Employee;
-import com.assessment.employees.domain.model.EmployeeId;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 
 /**
@@ -19,34 +20,26 @@ public class UpdateEmployee {
     }
     
     public EmployeeResult execute(UpdateEmployeeCommand command) {
-        EmployeeId employeeId = new EmployeeId(java.util.UUID.fromString(command.id()));
-        
-        // Check if employee exists
-        Employee existing = repository.findById(employeeId)
-            .orElseThrow(() -> new EmployeeNotFoundException(employeeId));
+        Document document = Document.of(command.documentType(), command.documentNumber());
+        Employee existing = repository.findByDocument(document)
+            .orElseThrow(() -> new EmployeeNotFoundException(document));
+        if (!existing.getHireDate().equals(command.hireDate())) {
+            throw new InvalidEmployeeDataException("La fecha de contratación no se puede modificar.");
+        }
         
         // Check for duplicate email (excluding current employee)
         repository.findByEmail(command.email()).ifPresent(emp -> {
-            if (!emp.getId().equals(employeeId)) {
+            if (!emp.getDocument().equals(document)) {
                 throw new DuplicateEmployeeException("email", command.email());
             }
         });
         
         // Check for duplicate document number (excluding current employee)
-        repository.findByDocumentNumber(command.documentNumber()).ifPresent(emp -> {
-            if (!emp.getId().equals(employeeId)) {
-                throw new DuplicateEmployeeException("document number", command.documentNumber());
-            }
-        });
-        
-        // Update employee
         existing.update(
-            command.documentNumber(),
             command.firstName(),
             command.lastName(),
             command.email(),
-            command.position(),
-            command.hireDate()
+            command.position()
         );
         
         // Save to repository
@@ -54,4 +47,5 @@ public class UpdateEmployee {
         
         return EmployeeResult.fromDomain(updated);
     }
+
 }

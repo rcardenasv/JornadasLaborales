@@ -5,6 +5,6 @@ package com.assessment.employees.domain.exception;
  */
 public class DuplicateEmployeeException extends DomainException {
     public DuplicateEmployeeException(String field, String value) {
-        super("Employee with " + field + " '" + value + "' already exists");
+        super("Ya existe un empleado con ese " + field + ".");
     }
 }

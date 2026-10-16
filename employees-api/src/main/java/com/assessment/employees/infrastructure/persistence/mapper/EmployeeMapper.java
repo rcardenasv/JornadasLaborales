@@ -3,7 +3,7 @@ package com.assessment.employees.infrastructure.persistence.mapper;
 import com.assessment.employees.domain.model.Employee;
 import com.assessment.employees.domain.model.EmployeeId;
 import com.assessment.employees.domain.model.Email;
-import com.assessment.employees.domain.model.DocumentNumber;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.infrastructure.persistence.entity.EmployeeEntity;
 
 /**
@@ -16,7 +16,7 @@ public final class EmployeeMapper {
     public static Employee toDomain(EmployeeEntity entity) {
         return new Employee(
             new EmployeeId(entity.getId()),
-            new DocumentNumber(entity.getDocumentNumber()),
+            Document.of(entity.getDocumentType(), entity.getDocumentNumber()),
             entity.getFirstName(),
             entity.getLastName(),
             new Email(entity.getEmail()),
@@ -28,7 +28,8 @@ public final class EmployeeMapper {
     public static EmployeeEntity toEntity(Employee domain) {
         return new EmployeeEntity(
             domain.getId().value(),
-            domain.getDocumentNumber().value(),
+            domain.getDocumentType().name(),
+            domain.getDocumentNumber(),
             domain.getFirstName(),
             domain.getLastName(),
             domain.getEmail().value(),

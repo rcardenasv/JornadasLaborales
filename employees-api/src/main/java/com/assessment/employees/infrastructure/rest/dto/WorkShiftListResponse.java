@@ -8,5 +8,8 @@ import java.util.List;
  */
 public record WorkShiftListResponse(
     List<WorkShiftResponse> shifts,
-    Duration totalWorkedHours
+    Duration totalWorkedHours,
+    Duration totalDaytimeHours,
+    Duration totalNighttimeHours,
+    List<WeeklySummaryResponse> weeklySummaries
 ) {}

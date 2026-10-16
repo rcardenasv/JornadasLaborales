@@ -2,6 +2,10 @@ package com.assessment.employees.infrastructure.rest.error;
 
 import com.assessment.employees.domain.exception.DuplicateEmployeeException;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
+import com.assessment.employees.domain.exception.InvalidDateRangeException;
+import com.assessment.employees.domain.exception.InvalidEmployeeDataException;
+import com.assessment.employees.domain.exception.WeeklyHoursExceededException;
+import com.assessment.employees.domain.exception.WorkShiftBulkConflictException;
 import com.assessment.employees.domain.exception.WorkShiftNotFoundException;
 import com.assessment.employees.domain.exception.WorkShiftOverlapException;
 import jakarta.validation.ConstraintViolation;
@@ -40,8 +44,18 @@ public class GlobalExceptionHandler implements ExceptionMapper<Throwable> {
         if (exception instanceof DuplicateEmployeeException) {
             return respond(Problem.conflict("Ya existe un empleado con ese correo o número de documento."));
         }
+        if (exception instanceof InvalidEmployeeDataException) {
+            return respond(Problem.badRequest(exception.getMessage()));
+        }
         if (exception instanceof WorkShiftOverlapException) {
             return respond(Problem.conflict("La jornada se solapa con otra jornada del empleado."));
+        }
+        if (exception instanceof WeeklyHoursExceededException
+                || exception instanceof WorkShiftBulkConflictException) {
+            return respond(Problem.conflict(exception.getMessage()));
+        }
+        if (exception instanceof InvalidDateRangeException) {
+            return respond(Problem.badRequest(exception.getMessage()));
         }
         if (exception instanceof ConstraintViolationException) {
             Map<String, String> errors = new HashMap<>();

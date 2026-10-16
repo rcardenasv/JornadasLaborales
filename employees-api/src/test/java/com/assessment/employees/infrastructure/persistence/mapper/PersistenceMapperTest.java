@@ -1,7 +1,7 @@
 package com.assessment.employees.infrastructure.persistence.mapper;
 
 import com.assessment.employees.domain.model.Employee;
-import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WorkShift;
 import com.assessment.employees.infrastructure.persistence.entity.EmployeeEntity;
 import com.assessment.employees.infrastructure.persistence.entity.WorkShiftEntity;
@@ -28,25 +28,24 @@ class PersistenceMapperTest {
 
     @Test
     void mapsWorkShiftToEntityAndBack() {
-        EmployeeId employeeId = EmployeeId.random();
-        WorkShift shift = WorkShift.create(employeeId, LocalDate.now(),
+        Document employeeDocument = Document.of("CC", "123456");
+        WorkShift shift = WorkShift.create(employeeDocument, LocalDate.now(),
             LocalTime.of(9, 0), LocalTime.of(17, 0));
         WorkShiftEntity entity = WorkShiftMapper.toEntity(shift);
         WorkShift restored = WorkShiftMapper.toDomain(entity);
         assertEquals(shift.getId(), entity.getId());
         assertEquals(shift.getId(), restored.getId());
-        assertEquals(employeeId, restored.getEmployeeId());
+        assertEquals(employeeDocument, restored.getEmployeeDocument());
         assertEquals(shift.getWorkedHours(), restored.getWorkedHours());
     }
 
     @Test
     void restoresShiftWithExplicitUuid() {
         UUID shiftId = UUID.randomUUID();
-        UUID employeeId = UUID.randomUUID();
-        WorkShiftEntity entity = new WorkShiftEntity(shiftId, employeeId,
+        WorkShiftEntity entity = new WorkShiftEntity(shiftId, "CC", "123456",
             LocalDate.now(), LocalTime.of(8, 0), LocalTime.of(16, 0));
         WorkShift restored = WorkShiftMapper.toDomain(entity);
         assertEquals(shiftId, restored.getId());
-        assertEquals(employeeId, restored.getEmployeeId().value());
+        assertEquals(Document.of("CC", "123456"), restored.getEmployeeDocument());
     }
 }

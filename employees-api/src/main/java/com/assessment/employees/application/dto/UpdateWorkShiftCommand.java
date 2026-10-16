@@ -9,7 +9,8 @@ import java.util.UUID;
  */
 public record UpdateWorkShiftCommand(
     UUID id,
-    String employeeId,
+    String documentType,
+    String documentNumber,
     LocalDate date,
     LocalTime startTime,
     LocalTime endTime

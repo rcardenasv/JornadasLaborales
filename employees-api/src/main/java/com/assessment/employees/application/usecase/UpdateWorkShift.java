@@ -5,72 +5,62 @@ import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.exception.WorkShiftNotFoundException;
 import com.assessment.employees.domain.exception.WorkShiftOverlapException;
-import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WorkShift;
+import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
+import java.util.List;
 import java.util.UUID;
 
-/**
- * Use case for updating a work shift.
- */
 public class UpdateWorkShift {
     private final WorkShiftRepository workShiftRepository;
     private final EmployeeRepository employeeRepository;
-    
+
     public UpdateWorkShift(WorkShiftRepository workShiftRepository,
                            EmployeeRepository employeeRepository) {
         this.workShiftRepository = workShiftRepository;
         this.employeeRepository = employeeRepository;
     }
-    
+
     public WorkShiftResult execute(UpdateWorkShiftCommand command) {
-        java.util.UUID id = command.id();
-        EmployeeId employeeId = new EmployeeId(UUID.fromString(command.employeeId()));
-        
-        // Check if work shift exists
+        UUID id = command.id();
+        Document document = Document.of(command.documentType(), command.documentNumber());
         WorkShift existing = workShiftRepository.findById(id)
+            .filter(shift -> shift.getEmployeeDocument().equals(document))
             .orElseThrow(() -> new WorkShiftNotFoundException(id));
-        
-        // Verify the work shift belongs to the specified employee
-        if (!existing.getEmployeeId().value().equals(employeeId.value())) {
-            throw new WorkShiftNotFoundException(id);
+        if (employeeRepository.findByDocument(document).isEmpty()) {
+            throw new EmployeeNotFoundException(document);
         }
-        
-        // Check if employee exists
-        if (!employeeRepository.existsById(employeeId)) {
-            throw new EmployeeNotFoundException(employeeId);
-        }
-        
-        // Check for overlapping shifts (excluding current shift)
-        var overlapping = workShiftRepository.findOverlapping(
-            employeeId,
-            command.date(),
-            command.startTime(),
-            command.endTime()
-        ).stream()
-         .filter(ws -> !ws.getId().equals(id))
-         .toList();
-        
-        if (!overlapping.isEmpty()) {
+
+        WorkShift updated = WorkShift.create(
+            document, command.date(), command.startTime(), command.endTime()
+        );
+        List<WorkShift> otherShifts = findRelevantShifts(document, updated).stream()
+            .filter(shift -> !shift.getId().equals(id))
+            .toList();
+        rejectOverlap(otherShifts, updated);
+        validateWeeklyWorkload(otherShifts, updated);
+        existing.update(command.date(), command.startTime(), command.endTime());
+        return WorkShiftResult.fromDomain(workShiftRepository.save(existing));
+    }
+
+    private List<WorkShift> findRelevantShifts(Document document, WorkShift shift) {
+        return workShiftRepository.findByEmployeeDocumentAndDateRange(
+            document, shift.getWeekStartDate().minusDays(1), shift.getWeekStartDate().plusWeeks(2)
+        );
+    }
+
+    private void rejectOverlap(List<WorkShift> shifts, WorkShift candidate) {
+        if (shifts.stream().anyMatch(candidate::overlaps)) {
             throw new WorkShiftOverlapException(
-                command.date(),
-                command.startTime(),
-                command.endTime()
+                candidate.getDate(), candidate.getStartTime(), candidate.getEndTime()
             );
         }
-        
-        // Update work shift
-        existing.update(
-            command.date(),
-            command.startTime(),
-            command.endTime()
-        );
-        
-        // Save to repository
-        WorkShift updated = workShiftRepository.save(existing);
-        
-        return WorkShiftResult.fromDomain(updated);
+    }
+
+    private void validateWeeklyWorkload(List<WorkShift> shifts, WorkShift candidate) {
+        WeeklyWorkloadPolicy.validateAdditions(shifts, List.of(candidate));
     }
 }

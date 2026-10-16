@@ -2,6 +2,7 @@ package com.assessment.employees.domain.repository;
 
 import com.assessment.employees.domain.model.Employee;
 import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +26,11 @@ public interface EmployeeRepository {
      * Finds an employee by document number.
      */
     Optional<Employee> findByDocumentNumber(String documentNumber);
+
+    default Optional<Employee> findByDocument(Document document) {
+        return findByDocumentNumber(document.number())
+            .filter(employee -> employee.getDocument().equals(document));
+    }
     
     /**
      * Finds an employee by email.
@@ -35,17 +41,20 @@ public interface EmployeeRepository {
      * Deletes an employee by ID.
      */
     void deleteById(EmployeeId id);
-    
+
+    default void deleteByDocument(Document document) {
+        findByDocument(document).ifPresent(employee -> deleteById(employee.getId()));
+    }
+
     /**
      * Checks if an employee exists by ID.
      */
     boolean existsById(EmployeeId id);
-    
-    /**
-     * Deletes all work shifts for an employee.
-     */
-    void deleteWorkShiftsByEmployeeId(EmployeeId employeeId);
-    
+
+    default boolean existsByDocument(Document document) {
+        return findByDocument(document).isPresent();
+    }
+
     /**
      * Finds a stable page of employees.
      */

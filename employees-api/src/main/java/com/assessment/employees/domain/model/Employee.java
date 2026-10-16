@@ -1,5 +1,7 @@
 package com.assessment.employees.domain.model;
 
+import com.assessment.employees.domain.exception.InvalidEmployeeDataException;
+
 import java.time.LocalDate;
 
 /**
@@ -7,18 +9,18 @@ import java.time.LocalDate;
  * Represents a worker in the system.
  */
 public class Employee {
-    private EmployeeId id;
-    private DocumentNumber documentNumber;
+    private final EmployeeId id;
+    private final Document document;
     private String firstName;
     private String lastName;
     private Email email;
     private String position;
-    private LocalDate hireDate;
+    private final LocalDate hireDate;
     
-    public Employee(EmployeeId id, DocumentNumber documentNumber, String firstName, 
+    public Employee(EmployeeId id, Document document, String firstName,
                    String lastName, Email email, String position, LocalDate hireDate) {
         this.id = id;
-        this.documentNumber = documentNumber;
+        this.document = document;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
@@ -29,28 +31,31 @@ public class Employee {
     }
     
     private void validate() {
+        if (id == null || document == null || email == null) {
+            throw new InvalidEmployeeDataException("La identidad, el documento y el correo son obligatorios.");
+        }
         if (firstName == null || firstName.isBlank() || firstName.length() > 100) {
-            throw new IllegalArgumentException("First name must be between 1 and 100 characters");
+            throw new InvalidEmployeeDataException("El nombre debe tener entre 1 y 100 caracteres.");
         }
         if (lastName == null || lastName.isBlank() || lastName.length() > 100) {
-            throw new IllegalArgumentException("Last name must be between 1 and 100 characters");
+            throw new InvalidEmployeeDataException("El apellido debe tener entre 1 y 100 caracteres.");
         }
         if (position == null || position.isBlank() || position.length() > 100) {
-            throw new IllegalArgumentException("Position must be between 1 and 100 characters");
+            throw new InvalidEmployeeDataException("El cargo debe tener entre 1 y 100 caracteres.");
         }
         if (hireDate == null) {
-            throw new IllegalArgumentException("Hire date cannot be null");
+            throw new InvalidEmployeeDataException("La fecha de contratación es obligatoria.");
         }
         if (hireDate.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Hire date cannot be in the future");
+            throw new InvalidEmployeeDataException("La fecha de contratación no puede ser futura.");
         }
     }
     
-    public static Employee create(String documentNumber, String firstName, String lastName, 
+    public static Employee create(Document document, String firstName, String lastName,
                                   String email, String position, LocalDate hireDate) {
         return new Employee(
             EmployeeId.random(),
-            new DocumentNumber(documentNumber),
+            document,
             firstName,
             lastName,
             new Email(email),
@@ -58,29 +63,47 @@ public class Employee {
             hireDate
         );
     }
+
+    public static Employee create(String documentNumber, String firstName, String lastName,
+                                  String email, String position, LocalDate hireDate) {
+        return create(Document.of("PA", documentNumber),
+            firstName, lastName, email, position, hireDate);
+    }
     
+    public void update(String firstName, String lastName, String email, String position) {
+        validateEditableFields(firstName, lastName, email, position);
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.email = new Email(email);
+        this.position = position;
+    }
+
     public void update(String documentNumber, String firstName, String lastName,
-                      String email, String position, LocalDate hireDate) {
-        Employee updated = new Employee(
-            id,
-            new DocumentNumber(documentNumber),
-            firstName,
-            lastName,
-            new Email(email),
-            position,
-            hireDate
-        );
-        this.documentNumber = updated.documentNumber;
-        this.firstName = updated.firstName;
-        this.lastName = updated.lastName;
-        this.email = updated.email;
-        this.position = updated.position;
-        this.hireDate = updated.hireDate;
+                       String email, String position, LocalDate requestedHireDate) {
+        if (!document.number().equals(documentNumber)) {
+            throw new InvalidEmployeeDataException("El documento del empleado no se puede modificar.");
+        }
+        if (!hireDate.equals(requestedHireDate)) {
+            throw new InvalidEmployeeDataException("La fecha de contratación no se puede modificar.");
+        }
+        update(firstName, lastName, email, position);
+    }
+
+    private void validateEditableFields(String firstName, String lastName,
+                                        String email, String position) {
+        if (firstName == null || firstName.isBlank() || firstName.length() > 100
+                || lastName == null || lastName.isBlank() || lastName.length() > 100
+                || position == null || position.isBlank() || position.length() > 100) {
+            throw new InvalidEmployeeDataException("Los nombres y el cargo deben tener entre 1 y 100 caracteres.");
+        }
+        new Email(email);
     }
     
     // Getters
     public EmployeeId getId() { return id; }
-    public DocumentNumber getDocumentNumber() { return documentNumber; }
+    public Document getDocument() { return document; }
+    public DocumentType getDocumentType() { return document.type(); }
+    public String getDocumentNumber() { return document.number(); }
     public String getFirstName() { return firstName; }
     public String getLastName() { return lastName; }
     public Email getEmail() { return email; }

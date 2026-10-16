@@ -7,7 +7,8 @@ import java.time.LocalTime;
  * Command to create a new work shift.
  */
 public record CreateWorkShiftCommand(
-    String employeeId,
+    String documentType,
+    String documentNumber,
     LocalDate date,
     LocalTime startTime,
     LocalTime endTime

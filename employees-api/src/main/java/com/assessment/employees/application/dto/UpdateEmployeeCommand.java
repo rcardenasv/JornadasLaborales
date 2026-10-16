@@ -6,7 +6,7 @@ import java.time.LocalDate;
  * Command to update an existing employee.
  */
 public record UpdateEmployeeCommand(
-    String id,
+    String documentType,
     String documentNumber,
     String firstName,
     String lastName,

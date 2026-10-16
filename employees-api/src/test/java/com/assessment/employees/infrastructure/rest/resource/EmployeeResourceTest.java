@@ -17,14 +17,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class EmployeeResourceTest {
+    private static final EmployeeResult EMPLOYEE = new EmployeeResult("CC", "123456", "Ana", "Diaz",
+        "ana@example.com", "Analyst", LocalDate.of(2020, 1, 1));
+
     @Mock CreateEmployee createEmployee;
     @Mock GetEmployee getEmployee;
     @Mock ListEmployees listEmployees;
@@ -39,21 +41,20 @@ class EmployeeResourceTest {
     }
 
     @Test
-    void createReturns201AndLocation() {
-        UUID id = UUID.randomUUID();
-        when(createEmployee.execute(any())).thenReturn(employee(id));
+    void createReturns201AndNaturalIdentityLocation() {
+        when(createEmployee.execute(any())).thenReturn(EMPLOYEE);
         when(uriInfo.getAbsolutePathBuilder()).thenReturn(UriBuilder.fromUri("http://localhost/api/v1/employees"));
 
-        Response response = resource.create(new CreateEmployeeRequest("EMP001", "Ana", "Diaz",
-            "ana@example.com", "Analyst", LocalDate.now()), uriInfo);
+        Response response = resource.create(new CreateEmployeeRequest("CC", "123456", "Ana", "Diaz",
+            "ana@example.com", "Analyst", EMPLOYEE.hireDate()), uriInfo);
 
         assertEquals(201, response.getStatus());
-        assertEquals("http://localhost/api/v1/employees/" + id, response.getLocation().toString());
+        assertEquals("http://localhost/api/v1/employees/CC/123456", response.getLocation().toString());
     }
 
     @Test
     void listReturnsRepositoryPaginationMetadata() {
-        when(listEmployees.execute(1, 5)).thenReturn(new EmployeePageResult(List.of(employee(UUID.randomUUID())), 1, 5, 12));
+        when(listEmployees.execute(1, 5)).thenReturn(new EmployeePageResult(List.of(EMPLOYEE), 1, 5, 12));
         Response response = resource.list(1, 5);
         PagedEmployeeResponse body = (PagedEmployeeResponse) response.getEntity();
         assertEquals(200, response.getStatus());
@@ -62,20 +63,17 @@ class EmployeeResourceTest {
     }
 
     @Test
-    void getUpdateAndDeleteDelegateWithPathId() {
-        String id = UUID.randomUUID().toString();
-        when(getEmployee.execute(id)).thenReturn(employee(UUID.fromString(id)));
-        when(updateEmployee.execute(any())).thenReturn(employee(UUID.fromString(id)));
+    void getUpdateAndDeleteDelegateWithDocumentPath() {
+        when(getEmployee.execute("CC", "123456")).thenReturn(EMPLOYEE);
+        when(updateEmployee.execute(any())).thenReturn(EMPLOYEE);
+        UpdateEmployeeRequest request = new UpdateEmployeeRequest("Ana", "Diaz",
+            "ana@example.com", "Analyst", EMPLOYEE.hireDate());
 
-        assertEquals(200, resource.get(id).getStatus());
-        assertEquals(200, resource.update(id, new UpdateEmployeeRequest("EMP001", "Ana", "Diaz",
-            "ana@example.com", "Analyst", LocalDate.now())).getStatus());
-        assertEquals(204, resource.delete(id).getStatus());
-        verify(updateEmployee).execute(argThat(command -> command.id().equals(id)));
-        verify(deleteEmployee).execute(id);
-    }
-
-    private EmployeeResult employee(UUID id) {
-        return new EmployeeResult(id, "EMP001", "Ana", "Diaz", "ana@example.com", "Analyst", LocalDate.now());
+        assertEquals(200, resource.get("CC", "123456").getStatus());
+        assertEquals(200, resource.update("CC", "123456", request).getStatus());
+        assertEquals(204, resource.delete("CC", "123456").getStatus());
+        verify(updateEmployee).execute(argThat(command ->
+            command.documentType().equals("CC") && command.documentNumber().equals("123456")));
+        verify(deleteEmployee).execute("CC", "123456");
     }
 }

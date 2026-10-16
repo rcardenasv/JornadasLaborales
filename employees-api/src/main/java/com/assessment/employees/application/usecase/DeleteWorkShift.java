@@ -2,7 +2,7 @@ package com.assessment.employees.application.usecase;
 
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.exception.WorkShiftNotFoundException;
-import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
@@ -21,21 +21,21 @@ public class DeleteWorkShift {
         this.employeeRepository = employeeRepository;
     }
     
-    public void execute(String shiftId, String employeeId) {
+    public void execute(String shiftId, String documentType, String documentNumber) {
         java.util.UUID id = java.util.UUID.fromString(shiftId);
-        EmployeeId empId = new EmployeeId(UUID.fromString(employeeId));
+        Document document = Document.of(documentType, documentNumber);
         
         // Check if work shift exists and belongs to employee
         var existing = workShiftRepository.findById(id)
             .orElseThrow(() -> new WorkShiftNotFoundException(id));
         
-        if (!existing.getEmployeeId().value().equals(empId.value())) {
+        if (!existing.getEmployeeDocument().equals(document)) {
             throw new WorkShiftNotFoundException(id);
         }
         
         // Check if employee exists
-        if (!employeeRepository.existsById(empId)) {
-            throw new EmployeeNotFoundException(empId);
+        if (employeeRepository.findByDocument(document).isEmpty()) {
+            throw new EmployeeNotFoundException(document);
         }
         
         // Delete work shift

@@ -2,6 +2,7 @@ package com.assessment.employees.infrastructure.persistence.repository;
 
 import com.assessment.employees.domain.model.Employee;
 import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.infrastructure.persistence.entity.EmployeeEntity;
 import com.assessment.employees.infrastructure.persistence.mapper.EmployeeMapper;
@@ -53,6 +54,18 @@ public class EmployeeJpaRepository implements EmployeeRepository {
                 .findFirst()
                 .map(EmployeeMapper::toDomain);
     }
+
+    @Override
+    public Optional<Employee> findByDocument(Document document) {
+        TypedQuery<EmployeeEntity> query = entityManager.createQuery(
+            "SELECT e FROM EmployeeEntity e WHERE e.documentType = :documentType " +
+                "AND e.documentNumber = :documentNumber",
+            EmployeeEntity.class
+        );
+        query.setParameter("documentType", document.type().name());
+        query.setParameter("documentNumber", document.number());
+        return query.getResultStream().findFirst().map(EmployeeMapper::toDomain);
+    }
     
     @Override
     public Optional<Employee> findByEmail(String email) {
@@ -79,14 +92,6 @@ public class EmployeeJpaRepository implements EmployeeRepository {
     @Override
     public boolean existsById(EmployeeId id) {
         return entityManager.find(EmployeeEntity.class, id.value()) != null;
-    }
-    
-    @Override
-    @Transactional
-    public void deleteWorkShiftsByEmployeeId(EmployeeId employeeId) {
-        entityManager.createQuery(
-            "DELETE FROM WorkShiftEntity w WHERE w.employeeId = :empId"
-        ).setParameter("empId", employeeId.value()).executeUpdate();
     }
     
     @Override

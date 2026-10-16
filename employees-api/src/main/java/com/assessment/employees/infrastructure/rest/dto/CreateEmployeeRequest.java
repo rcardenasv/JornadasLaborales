@@ -15,9 +15,13 @@ import java.time.LocalDate;
  */
 @Schema(name = "CreateEmployeeRequest", description = "Datos requeridos para crear un empleado.")
 public record CreateEmployeeRequest(
-    @Schema(example = "EMP001")
+    @Schema(example = "CC")
+    @NotBlank(message = "El tipo de documento es obligatorio.")
+    String documentType,
+
+    @Schema(example = "123456789")
     @NotBlank(message = "El número de documento es obligatorio.")
-    @Size(min = 5, max = 20, message = "El número de documento debe tener entre 5 y 20 caracteres.")
+    @Size(min = 3, max = 20, message = "El número de documento debe tener entre 3 y 20 caracteres.")
     @Pattern(regexp = "[a-zA-Z0-9]+", message = "El número de documento debe ser alfanumérico.")
     String documentNumber,
     

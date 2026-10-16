@@ -62,7 +62,10 @@ public class EmployeeResource {
     })
     public Response create(@Valid CreateEmployeeRequest request, @Context UriInfo uriInfo) {
         EmployeeResult result = createEmployee.execute(EmployeeMapper.toCommand(request));
-        return Response.created(uriInfo.getAbsolutePathBuilder().path(result.id().toString()).build())
+        return Response.created(uriInfo.getAbsolutePathBuilder()
+            .path(result.documentType())
+            .path(result.documentNumber())
+            .build())
             .entity(EmployeeMapper.toResponse(result)).build();
     }
     
@@ -92,47 +95,53 @@ public class EmployeeResource {
     }
     
     @GET
-    @Path("/{id}")
-    @Operation(summary = "Obtener empleado", description = "Busca un empleado por su UUID.")
+    @Path("/{documentType}/{documentNumber}")
+    @Operation(summary = "Obtener empleado", description = "Busca un empleado por tipo y número de documento.")
     @APIResponses({
         @APIResponse(responseCode = "200", description = "Empleado encontrado"),
-        @APIResponse(responseCode = "400", description = "UUID inválido"),
+        @APIResponse(responseCode = "400", description = "Documento inválido"),
         @APIResponse(responseCode = "404", description = "Empleado no encontrado")
     })
-    public Response get(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                        @PathParam("id") String id) {
-        EmployeeResult result = getEmployee.execute(id);
+    public Response get(@Parameter(description = "Tipo de documento", example = "CC")
+                        @PathParam("documentType") String documentType,
+                        @Parameter(description = "Número de documento", example = "123456789")
+                        @PathParam("documentNumber") String documentNumber) {
+        EmployeeResult result = getEmployee.execute(documentType, documentNumber);
         return Response.ok(EmployeeMapper.toResponse(result)).build();
     }
     
     @PUT
-    @Path("/{id}")
+    @Path("/{documentType}/{documentNumber}")
     @Operation(summary = "Actualizar empleado", description = "Reemplaza todos los datos editables del empleado.")
     @APIResponses({
         @APIResponse(responseCode = "200", description = "Empleado actualizado"),
-        @APIResponse(responseCode = "400", description = "UUID o datos inválidos"),
+        @APIResponse(responseCode = "400", description = "Documento o datos inválidos"),
         @APIResponse(responseCode = "404", description = "Empleado no encontrado"),
         @APIResponse(responseCode = "409", description = "Documento o correo duplicado")
     })
-    public Response update(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("id") String id,
+    public Response update(@Parameter(description = "Tipo de documento", example = "CC")
+                           @PathParam("documentType") String documentType,
+                           @Parameter(description = "Número de documento", example = "123456789")
+                           @PathParam("documentNumber") String documentNumber,
                            @Valid UpdateEmployeeRequest request) {
-        UpdateEmployeeCommand command = EmployeeMapper.toCommand(id, request);
+        UpdateEmployeeCommand command = EmployeeMapper.toCommand(documentType, documentNumber, request);
         EmployeeResult result = updateEmployee.execute(command);
         return Response.ok(EmployeeMapper.toResponse(result)).build();
     }
     
     @DELETE
-    @Path("/{id}")
+    @Path("/{documentType}/{documentNumber}")
     @Operation(summary = "Eliminar empleado", description = "Elimina el empleado y sus jornadas asociadas.")
     @APIResponses({
         @APIResponse(responseCode = "204", description = "Empleado eliminado"),
-        @APIResponse(responseCode = "400", description = "UUID inválido"),
+        @APIResponse(responseCode = "400", description = "Documento inválido"),
         @APIResponse(responseCode = "404", description = "Empleado no encontrado")
     })
-    public Response delete(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("id") String id) {
-        deleteEmployee.execute(id);
+    public Response delete(@Parameter(description = "Tipo de documento", example = "CC")
+                           @PathParam("documentType") String documentType,
+                           @Parameter(description = "Número de documento", example = "123456789")
+                           @PathParam("documentNumber") String documentNumber) {
+        deleteEmployee.execute(documentType, documentNumber);
         return Response.noContent().build();
     }
 }

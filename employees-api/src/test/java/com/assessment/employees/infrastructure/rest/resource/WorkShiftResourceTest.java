@@ -1,7 +1,13 @@
 package com.assessment.employees.infrastructure.rest.resource;
 
 import com.assessment.employees.application.dto.WorkShiftResult;
+import com.assessment.employees.application.dto.BulkCreateWorkShiftsResult;
+import com.assessment.employees.application.dto.WorkShiftListResult;
+import com.assessment.employees.application.dto.WeeklyWorkloadSummaryResult;
 import com.assessment.employees.application.usecase.*;
+import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
+import com.assessment.employees.domain.model.Document;
+import com.assessment.employees.domain.model.WorkShift;
 import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.WorkShiftListResponse;
@@ -15,10 +21,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.UUID;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,7 +33,11 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class WorkShiftResourceTest {
+    private static final String TYPE = "CC";
+    private static final String NUMBER = "123456";
+
     @Mock CreateWorkShift create;
+    @Mock BulkCreateWorkShifts bulkCreate;
     @Mock GetWorkShift get;
     @Mock ListEmployeeWorkShifts list;
     @Mock UpdateWorkShift update;
@@ -36,49 +47,74 @@ class WorkShiftResourceTest {
 
     @BeforeEach
     void setUp() {
-        resource = new WorkShiftResource(create, get, list, update, delete);
+        resource = new WorkShiftResource(create, bulkCreate, get, list, update, delete);
     }
 
     @Test
     void createReturns201AndLocation() {
-        String employeeId = UUID.randomUUID().toString();
-        WorkShiftResult shift = shift(employeeId);
+        WorkShiftResult shift = shift();
         when(create.execute(any())).thenReturn(shift);
         when(uriInfo.getAbsolutePathBuilder()).thenReturn(UriBuilder.fromUri(
-            "http://localhost/api/v1/employees/" + employeeId + "/work-shifts"));
+            "http://localhost/api/v1/employees/" + TYPE + "/" + NUMBER + "/work-shifts"));
 
-        Response response = resource.create(employeeId, request(), uriInfo);
+        Response response = resource.create(TYPE, NUMBER, request(), uriInfo);
 
         assertEquals(201, response.getStatus());
-        assertEquals("http://localhost/api/v1/employees/" + employeeId + "/work-shifts/" + shift.id(),
-            response.getLocation().toString());
+        assertEquals("http://localhost/api/v1/employees/" + TYPE + "/" + NUMBER
+            + "/work-shifts/" + shift.id(), response.getLocation().toString());
     }
 
     @Test
-    void listParsesFiltersAndTotalsHours() {
-        String employeeId = UUID.randomUUID().toString();
-        when(list.execute(employeeId, LocalDate.parse("2026-10-01"), null)).thenReturn(List.of(shift(employeeId)));
+    void bulkCreateReturns201AndFilteredListLocation() {
+        WorkShiftResult result = shift();
+        when(bulkCreate.execute(any())).thenReturn(
+            new BulkCreateWorkShiftsResult(List.of(result), Duration.ofHours(8))
+        );
+        when(uriInfo.getAbsolutePathBuilder()).thenReturn(UriBuilder.fromUri(
+            "http://localhost/api/v1/employees/" + TYPE + "/" + NUMBER + "/work-shifts/bulk"));
+        when(uriInfo.getPath()).thenReturn("/api/v1/employees/" + TYPE + "/" + NUMBER + "/work-shifts/bulk");
+        LocalDate from = LocalDate.of(2026, 10, 1);
+        LocalDate to = LocalDate.of(2026, 10, 2);
 
-        WorkShiftListResponse response = (WorkShiftListResponse) resource.list(employeeId,
+        Response response = resource.bulkCreate(TYPE, NUMBER,
+            new BulkCreateWorkShiftsRequest(from, to, Set.of(DayOfWeek.THURSDAY),
+                LocalTime.of(9, 0), LocalTime.of(17, 0)), uriInfo);
+
+        assertEquals(201, response.getStatus());
+        assertTrue(response.getLocation().toString().contains("/work-shifts?from=2026-10-01&to=2026-10-02"));
+    }
+
+    @Test
+    void listParsesFiltersAndReturnsTotalsAndWeeklySummary() {
+        WorkShiftResult result = shift();
+        when(list.execute(TYPE, NUMBER, LocalDate.parse("2026-10-01"), null)).thenReturn(
+            new WorkShiftListResult(List.of(result), List.of(
+                new WeeklyWorkloadSummaryResult(LocalDate.of(2026, 9, 28), Duration.ofHours(8))
+            ))
+        );
+
+        WorkShiftListResponse response = (WorkShiftListResponse) resource.list(TYPE, NUMBER,
             "2026-10-01", null).getEntity();
 
         assertEquals(1, response.shifts().size());
         assertEquals(Duration.ofHours(8), response.totalWorkedHours());
-        assertThrows(IllegalArgumentException.class, () -> resource.list(employeeId, "yesterday", null));
+        assertEquals(Duration.ofHours(8), response.weeklySummaries().get(0).scheduledHours());
+        assertThrows(IllegalArgumentException.class,
+            () -> resource.list(TYPE, NUMBER, "yesterday", null));
     }
 
     @Test
     void getUpdateAndDeleteDelegate() {
-        String employeeId = UUID.randomUUID().toString();
-        WorkShiftResult shift = shift(employeeId);
-        when(get.execute(shift.id().toString(), employeeId)).thenReturn(shift);
-        when(update.execute(any())).thenReturn(shift);
+        WorkShiftResult result = shift();
+        String shiftId = result.id().toString();
+        when(get.execute(shiftId, TYPE, NUMBER)).thenReturn(result);
+        when(update.execute(any())).thenReturn(result);
 
-        assertEquals(200, resource.get(employeeId, shift.id().toString()).getStatus());
-        assertEquals(200, resource.update(employeeId, shift.id().toString(),
-            new UpdateWorkShiftRequest(shift.date(), shift.startTime(), shift.endTime())).getStatus());
-        assertEquals(204, resource.delete(employeeId, shift.id().toString()).getStatus());
-        verify(delete).execute(shift.id().toString(), employeeId);
+        assertEquals(200, resource.get(TYPE, NUMBER, shiftId).getStatus());
+        assertEquals(200, resource.update(TYPE, NUMBER, shiftId,
+            new UpdateWorkShiftRequest(result.date(), result.startTime(), result.endTime())).getStatus());
+        assertEquals(204, resource.delete(TYPE, NUMBER, shiftId).getStatus());
+        verify(delete).execute(shiftId, TYPE, NUMBER);
     }
 
     private CreateWorkShiftRequest request() {
@@ -86,8 +122,8 @@ class WorkShiftResourceTest {
             LocalTime.of(9, 0), LocalTime.of(17, 0));
     }
 
-    private WorkShiftResult shift(String employeeId) {
-        return new WorkShiftResult(UUID.randomUUID(), employeeId, LocalDate.parse("2026-10-01"),
-            LocalTime.of(9, 0), LocalTime.of(17, 0), Duration.ofHours(8));
+    private WorkShiftResult shift() {
+        return WorkShiftResult.fromDomain(WorkShift.create(Document.of(TYPE, NUMBER),
+            LocalDate.parse("2026-10-01"), LocalTime.of(9, 0), LocalTime.of(17, 0)));
     }
 }

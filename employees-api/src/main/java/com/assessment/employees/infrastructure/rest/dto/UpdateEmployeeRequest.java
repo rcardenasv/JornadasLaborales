@@ -4,7 +4,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
@@ -15,12 +14,6 @@ import java.time.LocalDate;
  */
 @Schema(name = "UpdateEmployeeRequest", description = "Datos completos para reemplazar un empleado.")
 public record UpdateEmployeeRequest(
-    @Schema(example = "EMP001")
-    @NotBlank(message = "El número de documento es obligatorio.")
-    @Size(min = 5, max = 20, message = "El número de documento debe tener entre 5 y 20 caracteres.")
-    @Pattern(regexp = "[a-zA-Z0-9]+", message = "El número de documento debe ser alfanumérico.")
-    String documentNumber,
-    
     @Schema(example = "Ana")
     @NotBlank(message = "El nombre es obligatorio.")
     @Size(max = 100, message = "El nombre no puede superar 100 caracteres.")

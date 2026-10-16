@@ -1,7 +1,8 @@
 package com.assessment.employees.application.usecase;
 
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
-import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
+import com.assessment.employees.domain.model.Employee;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 
 /**
@@ -14,18 +15,10 @@ public class DeleteEmployee {
         this.repository = repository;
     }
     
-    public void execute(String id) {
-        EmployeeId employeeId = new EmployeeId(java.util.UUID.fromString(id));
-        
-        // Check if employee exists
-        if (!repository.existsById(employeeId)) {
-            throw new EmployeeNotFoundException(employeeId);
-        }
-        
-        // Delete associated work shifts first (cascada will handle this, but we clean up explicitly)
-        repository.deleteWorkShiftsByEmployeeId(employeeId);
-        
-        // Delete employee
-        repository.deleteById(employeeId);
+    public void execute(String documentType, String documentNumber) {
+        Document document = Document.of(documentType, documentNumber);
+        Employee employee = repository.findByDocument(document)
+            .orElseThrow(() -> new EmployeeNotFoundException(document));
+        repository.deleteById(employee.getId());
     }
 }

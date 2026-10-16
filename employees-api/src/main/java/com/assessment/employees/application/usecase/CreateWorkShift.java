@@ -4,60 +4,56 @@ import com.assessment.employees.application.dto.CreateWorkShiftCommand;
 import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.exception.WorkShiftOverlapException;
-import com.assessment.employees.domain.model.EmployeeId;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WorkShift;
+import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
-import java.util.UUID;
+import java.time.LocalDate;
+import java.util.List;
 
-/**
- * Use case for creating a work shift.
- */
 public class CreateWorkShift {
     private final WorkShiftRepository workShiftRepository;
     private final EmployeeRepository employeeRepository;
-    
-    public CreateWorkShift(WorkShiftRepository workShiftRepository, 
-                          EmployeeRepository employeeRepository) {
+
+    public CreateWorkShift(WorkShiftRepository workShiftRepository,
+                           EmployeeRepository employeeRepository) {
         this.workShiftRepository = workShiftRepository;
         this.employeeRepository = employeeRepository;
     }
-    
+
     public WorkShiftResult execute(CreateWorkShiftCommand command) {
-        // Check if employee exists
-        EmployeeId employeeId = new EmployeeId(UUID.fromString(command.employeeId()));
-        if (!employeeRepository.existsById(employeeId)) {
-            throw new EmployeeNotFoundException(employeeId);
+        Document document = Document.of(command.documentType(), command.documentNumber());
+        if (employeeRepository.findByDocument(document).isEmpty()) {
+            throw new EmployeeNotFoundException(document);
         }
-        
-        // Check for overlapping shifts
-        var overlapping = workShiftRepository.findOverlapping(
-            employeeId,
-            command.date(),
-            command.startTime(),
-            command.endTime()
+
+        WorkShift candidate = WorkShift.create(
+            document, command.date(), command.startTime(), command.endTime()
         );
-        
-        if (!overlapping.isEmpty()) {
+        List<WorkShift> existing = findRelevantShifts(document, candidate);
+        rejectOverlap(existing, candidate);
+        validateWeeklyWorkload(existing, List.of(candidate));
+        return WorkShiftResult.fromDomain(workShiftRepository.save(candidate));
+    }
+
+    List<WorkShift> findRelevantShifts(Document document, WorkShift candidate) {
+        LocalDate weekStart = candidate.getWeekStartDate();
+        return workShiftRepository.findByEmployeeDocumentAndDateRange(
+            document, weekStart.minusDays(1), weekStart.plusWeeks(2)
+        );
+    }
+
+    void rejectOverlap(List<WorkShift> existing, WorkShift candidate) {
+        if (existing.stream().anyMatch(candidate::overlaps)) {
             throw new WorkShiftOverlapException(
-                command.date(),
-                command.startTime(),
-                command.endTime()
+                candidate.getDate(), candidate.getStartTime(), candidate.getEndTime()
             );
         }
-        
-        // Create work shift
-        WorkShift workShift = WorkShift.create(
-            employeeId,
-            command.date(),
-            command.startTime(),
-            command.endTime()
-        );
-        
-        // Save to repository
-        WorkShift saved = workShiftRepository.save(workShift);
-        
-        return WorkShiftResult.fromDomain(saved);
+    }
+
+    void validateWeeklyWorkload(List<WorkShift> existing, List<WorkShift> additions) {
+        WeeklyWorkloadPolicy.validateAdditions(existing, additions);
     }
 }

@@ -16,6 +16,7 @@ public final class EmployeeMapper {
     
     public static CreateEmployeeCommand toCommand(CreateEmployeeRequest request) {
         return new CreateEmployeeCommand(
+            request.documentType(),
             request.documentNumber(),
             request.firstName(),
             request.lastName(),
@@ -25,10 +26,11 @@ public final class EmployeeMapper {
         );
     }
     
-    public static UpdateEmployeeCommand toCommand(String id, UpdateEmployeeRequest request) {
+    public static UpdateEmployeeCommand toCommand(String documentType, String documentNumber,
+                                                   UpdateEmployeeRequest request) {
         return new UpdateEmployeeCommand(
-            id,
-            request.documentNumber(),
+            documentType,
+            documentNumber,
             request.firstName(),
             request.lastName(),
             request.email(),
@@ -39,7 +41,7 @@ public final class EmployeeMapper {
     
     public static EmployeeResponse toResponse(EmployeeResult result) {
         return new EmployeeResponse(
-            result.id(),
+            result.documentType(),
             result.documentNumber(),
             result.firstName(),
             result.lastName(),

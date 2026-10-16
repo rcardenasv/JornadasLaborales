@@ -1,102 +1,220 @@
 package com.assessment.employees.infrastructure.rest.resource;
 
-import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.application.dto.UpdateWorkShiftCommand;
+import com.assessment.employees.application.dto.WorkShiftListResult;
+import com.assessment.employees.application.dto.WorkShiftResult;
+import com.assessment.employees.application.dto.BulkCreateWorkShiftsResult;
+import com.assessment.employees.application.usecase.BulkCreateWorkShifts;
 import com.assessment.employees.application.usecase.CreateWorkShift;
 import com.assessment.employees.application.usecase.DeleteWorkShift;
 import com.assessment.employees.application.usecase.GetWorkShift;
 import com.assessment.employees.application.usecase.ListEmployeeWorkShifts;
 import com.assessment.employees.application.usecase.UpdateWorkShift;
+import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
 import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
+import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
+import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsResponse;
+import com.assessment.employees.infrastructure.rest.dto.WeeklySummaryResponse;
 import com.assessment.employees.infrastructure.rest.dto.WorkShiftListResponse;
 import com.assessment.employees.infrastructure.rest.dto.WorkShiftResponse;
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.mapper.WorkShiftMapper;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
-import jakarta.inject.Inject;
-import jakarta.validation.Valid;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.WeekFields;
 import java.util.List;
 
-/**
- * REST resource for Work Shift operations.
- */
-@Path("/api/v1/employees/{employeeId}/work-shifts")
+@Path("/api/v1/employees/{documentType}/{documentNumber}/work-shifts")
 @Produces("application/json")
 @Consumes("application/json")
 public class WorkShiftResource {
-    
     private final CreateWorkShift createWorkShift;
+    private final BulkCreateWorkShifts bulkCreateWorkShifts;
     private final GetWorkShift getWorkShift;
     private final ListEmployeeWorkShifts listWorkShifts;
     private final UpdateWorkShift updateWorkShift;
     private final DeleteWorkShift deleteWorkShift;
-    
+
     @Inject
-    public WorkShiftResource(CreateWorkShift createWorkShift,
-                              GetWorkShift getWorkShift,
-                              ListEmployeeWorkShifts listWorkShifts,
-                              UpdateWorkShift updateWorkShift,
-                              DeleteWorkShift deleteWorkShift) {
+    public WorkShiftResource(CreateWorkShift createWorkShift, BulkCreateWorkShifts bulkCreateWorkShifts,
+                             GetWorkShift getWorkShift,
+                             ListEmployeeWorkShifts listWorkShifts,
+                             UpdateWorkShift updateWorkShift, DeleteWorkShift deleteWorkShift) {
         this.createWorkShift = createWorkShift;
+        this.bulkCreateWorkShifts = bulkCreateWorkShifts;
         this.getWorkShift = getWorkShift;
         this.listWorkShifts = listWorkShifts;
         this.updateWorkShift = updateWorkShift;
         this.deleteWorkShift = deleteWorkShift;
     }
-    
+
     @POST
-    @Operation(summary = "Crear jornada", description = "Agrega una jornada laboral no solapada al empleado.")
+    @Operation(summary = "Crear jornada", description = "Agrega una jornada laboral al empleado.")
     @APIResponses({
         @APIResponse(responseCode = "201", description = "Jornada creada"),
         @APIResponse(responseCode = "400", description = "Datos inválidos"),
         @APIResponse(responseCode = "404", description = "Empleado no encontrado"),
-        @APIResponse(responseCode = "409", description = "La jornada se solapa con otra")
+        @APIResponse(responseCode = "409", description = "Solape o tope semanal excedido")
     })
-    public Response create(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("employeeId") String employeeId,
+    public Response create(@PathParam("documentType") String documentType,
+                           @PathParam("documentNumber") String documentNumber,
                            @Valid CreateWorkShiftRequest request,
                            @Context UriInfo uriInfo) {
-        WorkShiftResult result = createWorkShift.execute(WorkShiftMapper.toCommand(employeeId, request));
+        WorkShiftResult result = createWorkShift.execute(
+            WorkShiftMapper.toCommand(documentType, documentNumber, request)
+        );
         return Response.created(uriInfo.getAbsolutePathBuilder().path(result.id().toString()).build())
-            .entity(WorkShiftMapper.toResponse(result)).build();
+            .entity(WorkShiftMapper.toResponse(result))
+            .build();
     }
-    
+
+    @POST
+    @Path("/bulk")
+    @Operation(
+        summary = "Crear jornadas en bloque",
+        description = "Crea todas las jornadas del rango de forma atómica; weekdays omitido significa todos los días."
+    )
+    @APIResponses({
+        @APIResponse(responseCode = "201", description = "Jornadas creadas"),
+        @APIResponse(responseCode = "400", description = "Rango, días u horario inválido"),
+        @APIResponse(responseCode = "404", description = "Empleado no encontrado"),
+        @APIResponse(responseCode = "409", description = "Solape o tope semanal excedido; no se crea ninguna jornada")
+    })
+    public Response bulkCreate(@PathParam("documentType") String documentType,
+                               @PathParam("documentNumber") String documentNumber,
+                               @Valid BulkCreateWorkShiftsRequest request,
+                               @Context UriInfo uriInfo) {
+        BulkCreateWorkShiftsResult result = bulkCreateWorkShifts.execute(
+            WorkShiftMapper.toCommand(documentType, documentNumber, request)
+        );
+        BulkCreateWorkShiftsResponse response = new BulkCreateWorkShiftsResponse(
+            result.createdShifts().stream().map(WorkShiftMapper::toResponse).toList(),
+            result.createdShifts().size(),
+            result.scheduledHours()
+        );
+        String listPath = uriInfo.getPath().substring(0, uriInfo.getPath().lastIndexOf("/bulk"));
+        return Response.created(uriInfo.getAbsolutePathBuilder()
+                .replacePath(listPath)
+                .queryParam("from", request.from())
+                .queryParam("to", request.to())
+                .build())
+            .entity(response)
+            .build();
+    }
+
     @GET
-    @Operation(summary = "Listar jornadas", description = "Lista las jornadas ordenadas y suma sus horas trabajadas.")
+    @Operation(summary = "Listar jornadas", description = "Lista jornadas y su carga semanal.")
     @APIResponses({
         @APIResponse(responseCode = "200", description = "Jornadas del empleado"),
         @APIResponse(responseCode = "400", description = "Fecha o rango inválido"),
         @APIResponse(responseCode = "404", description = "Empleado no encontrado")
     })
-    public Response list(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                         @PathParam("employeeId") String employeeId,
-                         @Parameter(description = "Fecha inicial inclusiva (yyyy-MM-dd)", example = "2026-10-01")
+    public Response list(@PathParam("documentType") String documentType,
+                         @PathParam("documentNumber") String documentNumber,
+                         @Parameter(description = "Fecha inicial inclusiva (yyyy-MM-dd)")
                          @QueryParam("from") String from,
-                         @Parameter(description = "Fecha final inclusiva (yyyy-MM-dd)", example = "2026-10-31")
+                         @Parameter(description = "Fecha final inclusiva (yyyy-MM-dd)")
                          @QueryParam("to") String to) {
         LocalDate fromDate = parseDate(from);
         LocalDate toDate = parseDate(to);
-        
-        List<WorkShiftResult> results = listWorkShifts.execute(employeeId, fromDate, toDate);
+        WorkShiftListResult listResult = listWorkShifts.execute(
+            documentType, documentNumber, fromDate, toDate
+        );
+        List<WorkShiftResult> results = listResult.shifts();
         List<WorkShiftResponse> responses = results.stream()
             .map(WorkShiftMapper::toResponse)
-                .toList();
-        
-        java.time.Duration totalHours = results.stream()
-                .map(WorkShiftResult::workedHours)
-                .reduce(java.time.Duration.ZERO, java.time.Duration::plus);
-        
-        return Response.ok(new WorkShiftListResponse(responses, totalHours)).build();
+            .toList();
+        Duration totalHours = sum(results, WorkShiftResult::workedHours);
+        Duration daytimeHours = sum(results, WorkShiftResult::daytimeHours);
+        Duration nighttimeHours = sum(results, WorkShiftResult::nighttimeHours);
+        return Response.ok(new WorkShiftListResponse(
+            responses, totalHours, daytimeHours, nighttimeHours,
+            listResult.weeklySummaries().stream().map(summary -> {
+                LocalDate weekStart = summary.weekStart();
+                WeekFields iso = WeekFields.ISO;
+                Duration remainingHours = WeeklyWorkloadPolicy.MAX_WEEKLY_HOURS
+                    .minus(summary.scheduledHours());
+                return new WeeklySummaryResponse(
+                    "%d-W%02d".formatted(weekStart.get(iso.weekBasedYear()),
+                        weekStart.get(iso.weekOfWeekBasedYear())),
+                    weekStart,
+                    weekStart.plusDays(6),
+                    summary.scheduledHours(),
+                    WeeklyWorkloadPolicy.MAX_WEEKLY_HOURS,
+                    remainingHours.isNegative() ? Duration.ZERO : remainingHours
+                );
+            }).toList()
+        )).build();
+    }
+
+    @GET
+    @Path("/{shiftId}")
+    @Operation(summary = "Obtener jornada", description = "Busca una jornada del empleado.")
+    @APIResponses({
+        @APIResponse(responseCode = "200", description = "Jornada encontrada"),
+        @APIResponse(responseCode = "400", description = "UUID inválido"),
+        @APIResponse(responseCode = "404", description = "Empleado o jornada no encontrado")
+    })
+    public Response get(@PathParam("documentType") String documentType,
+                        @PathParam("documentNumber") String documentNumber,
+                        @PathParam("shiftId") String shiftId) {
+        WorkShiftResult result = getWorkShift.execute(shiftId, documentType, documentNumber);
+        return Response.ok(WorkShiftMapper.toResponse(result)).build();
+    }
+
+    @PUT
+    @Path("/{shiftId}")
+    @Operation(summary = "Actualizar jornada", description = "Reemplaza fecha y horario.")
+    @APIResponses({
+        @APIResponse(responseCode = "200", description = "Jornada actualizada"),
+        @APIResponse(responseCode = "400", description = "UUID o datos inválidos"),
+        @APIResponse(responseCode = "404", description = "Empleado o jornada no encontrado"),
+        @APIResponse(responseCode = "409", description = "Solape o tope semanal excedido")
+    })
+    public Response update(@PathParam("documentType") String documentType,
+                           @PathParam("documentNumber") String documentNumber,
+                           @PathParam("shiftId") String shiftId,
+                           @Valid UpdateWorkShiftRequest request) {
+        UpdateWorkShiftCommand command = WorkShiftMapper.toCommand(
+            java.util.UUID.fromString(shiftId), documentType, documentNumber, request
+        );
+        WorkShiftResult result = updateWorkShift.execute(command);
+        return Response.ok(WorkShiftMapper.toResponse(result)).build();
+    }
+
+    @DELETE
+    @Path("/{shiftId}")
+    @Operation(summary = "Eliminar jornada", description = "Elimina la jornada.")
+    @APIResponses({
+        @APIResponse(responseCode = "204", description = "Jornada eliminada"),
+        @APIResponse(responseCode = "400", description = "UUID inválido"),
+        @APIResponse(responseCode = "404", description = "Empleado o jornada no encontrado")
+    })
+    public Response delete(@PathParam("documentType") String documentType,
+                           @PathParam("documentNumber") String documentNumber,
+                           @PathParam("shiftId") String shiftId) {
+        deleteWorkShift.execute(shiftId, documentType, documentNumber);
+        return Response.noContent().build();
     }
 
     private LocalDate parseDate(String value) {
@@ -109,56 +227,10 @@ public class WorkShiftResource {
             throw new IllegalArgumentException("Las fechas deben usar el formato ISO yyyy-MM-dd.", exception);
         }
     }
-    
-    @GET
-    @Path("/{shiftId}")
-    @Operation(summary = "Obtener jornada", description = "Busca una jornada dentro del empleado indicado.")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Jornada encontrada"),
-        @APIResponse(responseCode = "400", description = "UUID inválido"),
-        @APIResponse(responseCode = "404", description = "Empleado o jornada no encontrado")
-    })
-    public Response get(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                        @PathParam("employeeId") String employeeId,
-                        @Parameter(description = "UUID de la jornada", example = "650e8400-e29b-41d4-a716-446655440001")
-                        @PathParam("shiftId") String shiftId) {
-        WorkShiftResult result = getWorkShift.execute(shiftId, employeeId);
-        return Response.ok(WorkShiftMapper.toResponse(result)).build();
+
+    private Duration sum(List<WorkShiftResult> results,
+                         java.util.function.Function<WorkShiftResult, Duration> value) {
+        return results.stream().map(value).reduce(Duration.ZERO, Duration::plus);
     }
-    
-    @PUT
-    @Path("/{shiftId}")
-    @Operation(summary = "Actualizar jornada", description = "Reemplaza la fecha y el horario de una jornada.")
-    @APIResponses({
-        @APIResponse(responseCode = "200", description = "Jornada actualizada"),
-        @APIResponse(responseCode = "400", description = "UUID o datos inválidos"),
-        @APIResponse(responseCode = "404", description = "Empleado o jornada no encontrado"),
-        @APIResponse(responseCode = "409", description = "La jornada se solapa con otra")
-    })
-    public Response update(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("employeeId") String employeeId,
-                           @Parameter(description = "UUID de la jornada", example = "650e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("shiftId") String shiftId,
-                           @Valid UpdateWorkShiftRequest request) {
-        UpdateWorkShiftCommand command = WorkShiftMapper.toCommand(
-            java.util.UUID.fromString(shiftId), employeeId, request);
-        WorkShiftResult result = updateWorkShift.execute(command);
-        return Response.ok(WorkShiftMapper.toResponse(result)).build();
-    }
-    
-    @DELETE
-    @Path("/{shiftId}")
-    @Operation(summary = "Eliminar jornada", description = "Elimina la jornada indicada del empleado.")
-    @APIResponses({
-        @APIResponse(responseCode = "204", description = "Jornada eliminada"),
-        @APIResponse(responseCode = "400", description = "UUID inválido"),
-        @APIResponse(responseCode = "404", description = "Empleado o jornada no encontrado")
-    })
-    public Response delete(@Parameter(description = "UUID del empleado", example = "550e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("employeeId") String employeeId,
-                           @Parameter(description = "UUID de la jornada", example = "650e8400-e29b-41d4-a716-446655440001")
-                           @PathParam("shiftId") String shiftId) {
-        deleteWorkShift.execute(shiftId, employeeId);
-        return Response.noContent().build();
-    }
+
 }

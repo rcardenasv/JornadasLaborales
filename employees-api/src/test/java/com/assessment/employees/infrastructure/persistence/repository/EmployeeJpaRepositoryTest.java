@@ -4,7 +4,6 @@ import com.assessment.employees.domain.model.Employee;
 import com.assessment.employees.domain.model.EmployeeId;
 import com.assessment.employees.infrastructure.persistence.entity.EmployeeEntity;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,6 @@ class EmployeeJpaRepositoryTest {
     @Mock EntityManager entityManager;
     @Mock TypedQuery<EmployeeEntity> employeeQuery;
     @Mock TypedQuery<Long> countQuery;
-    @Mock Query mutationQuery;
     private EmployeeJpaRepository repository;
 
     @BeforeEach
@@ -89,17 +87,14 @@ class EmployeeJpaRepositoryTest {
     }
 
     @Test
-    void shouldDeleteEmployeeAndWorkShifts() {
+    void shouldDeleteEmployeeAndRelyOnDatabaseCascade() {
         EmployeeEntity entity = entity();
         when(entityManager.find(EmployeeEntity.class, entity.getId())).thenReturn(entity);
-        when(entityManager.createQuery(anyString())).thenReturn(mutationQuery);
-        when(mutationQuery.setParameter(anyString(), any())).thenReturn(mutationQuery);
 
         repository.deleteById(new EmployeeId(entity.getId()));
-        repository.deleteWorkShiftsByEmployeeId(new EmployeeId(entity.getId()));
 
         verify(entityManager).remove(entity);
-        verify(mutationQuery).executeUpdate();
+        verify(entityManager, never()).createQuery(anyString());
     }
 
     private Employee employee() {
@@ -107,7 +102,7 @@ class EmployeeJpaRepositoryTest {
     }
 
     private EmployeeEntity entity() {
-        return new EmployeeEntity(UUID.randomUUID(), "EMP001", "Ana", "Diaz",
+        return new EmployeeEntity(UUID.randomUUID(), "PA", "EMP001", "Ana", "Diaz",
             "ana@example.com", "Analyst", LocalDate.now());
     }
 }

@@ -8,14 +8,19 @@ import java.util.UUID;
  * JPA entity for Employee.
  */
 @Entity
-@Table(name = "employees")
+@Table(name = "employees", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_employees_document", columnNames = {"document_type", "document_number"})
+})
 public class EmployeeEntity {
     
     @Id
     @Column(name = "id")
     private UUID id;
     
-    @Column(name = "document_number", nullable = false, unique = true, length = 20)
+    @Column(name = "document_type", nullable = false, length = 2)
+    private String documentType;
+
+    @Column(name = "document_number", nullable = false, length = 20)
     private String documentNumber;
     
     @Column(name = "first_name", nullable = false, length = 100)
@@ -36,9 +41,10 @@ public class EmployeeEntity {
     // Default constructor
     public EmployeeEntity() {}
     
-    public EmployeeEntity(UUID id, String documentNumber, String firstName, 
+    public EmployeeEntity(UUID id, String documentType, String documentNumber, String firstName,
                          String lastName, String email, String position, LocalDate hireDate) {
         this.id = id;
+        this.documentType = documentType;
         this.documentNumber = documentNumber;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -50,6 +56,9 @@ public class EmployeeEntity {
     // Getters and setters
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
+
+    public String getDocumentType() { return documentType; }
+    public void setDocumentType(String documentType) { this.documentType = documentType; }
     
     public String getDocumentNumber() { return documentNumber; }
     public void setDocumentNumber(String documentNumber) { this.documentNumber = documentNumber; }
