@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -26,9 +27,16 @@ class UseCasesTest {
     private static final String TYPE = "PA";
     private static final String NUMBER = "EMP001";
     private static final Document DOCUMENT = Document.of(TYPE, NUMBER);
+    private static final LocalDate TODAY = LocalDate.of(2026, 1, 1);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+        java.time.Instant.parse("2026-01-01T12:00:00Z"), java.time.ZoneOffset.UTC);
 
     @Mock EmployeeRepository employees;
     @Mock WorkShiftRepository shifts;
+
+    private CreateEmployee createEmployee() {
+        return new CreateEmployee(employees, FIXED_CLOCK);
+    }
 
     @Test
     void createEmployeeChecksDuplicatesAndPersists() {
@@ -36,7 +44,7 @@ class UseCasesTest {
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.empty());
         when(employees.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        EmployeeResult result = new CreateEmployee(employees).execute(employeeCommand());
+        EmployeeResult result = createEmployee().execute(employeeCommand());
 
         assertEquals(NUMBER, result.documentNumber());
         assertEquals(TYPE, result.documentType());
@@ -47,14 +55,14 @@ class UseCasesTest {
     void createEmployeeRejectsDuplicateEmailAndDocument() {
         when(employees.findByEmail("ana@example.com")).thenReturn(Optional.of(employee()));
         assertThrows(DuplicateEmployeeException.class,
-            () -> new CreateEmployee(employees).execute(employeeCommand()));
+            () -> createEmployee().execute(employeeCommand()));
         verify(employees, never()).findByDocument(any(Document.class));
 
         reset(employees);
         when(employees.findByEmail("ana@example.com")).thenReturn(Optional.empty());
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(employee()));
         assertThrows(DuplicateEmployeeException.class,
-            () -> new CreateEmployee(employees).execute(employeeCommand()));
+            () -> createEmployee().execute(employeeCommand()));
     }
 
     @Test
@@ -65,12 +73,12 @@ class UseCasesTest {
         when(employees.findByDocument(Document.of("CE", "111"))).thenReturn(Optional.empty());
         when(employees.save(any())).thenAnswer(call -> call.getArgument(0));
 
-        CreateEmployee create = new CreateEmployee(employees);
+        CreateEmployee create = createEmployee();
         EmployeeResult cc = create.execute(new CreateEmployeeCommand(
-            "CC", "111", "Ana", "Diaz", "cc@example.com", "Analyst", LocalDate.now()
+            "CC", "111", "Ana", "Diaz", "cc@example.com", "Analyst", TODAY
         ));
         EmployeeResult ce = create.execute(new CreateEmployeeCommand(
-            "CE", "111", "Bea", "Lopez", "ce@example.com", "Analyst", LocalDate.now()
+            "CE", "111", "Bea", "Lopez", "ce@example.com", "Analyst", TODAY
         ));
 
         assertEquals(cc.documentNumber(), ce.documentNumber());
@@ -105,7 +113,7 @@ class UseCasesTest {
     void updateEmployeeAllowsSameValuesAndRejectsMissingDuplicateOrChangedHireDate() {
         Employee current = employee();
         UpdateEmployee useCase = new UpdateEmployee(employees);
-        UpdateEmployeeCommand same = employeeUpdate(LocalDate.now());
+        UpdateEmployeeCommand same = employeeUpdate(TODAY);
         when(employees.findByDocument(DOCUMENT)).thenAnswer(call -> Optional.of(current))
             .thenAnswer(call -> Optional.empty())
             .thenAnswer(call -> Optional.of(current))
@@ -113,18 +121,17 @@ class UseCasesTest {
         when(employees.findByEmail("ana@example.com")).thenReturn(Optional.of(current));
         when(employees.findByEmail("other@example.com")).thenReturn(Optional.of(
             Employee.create(Document.of("CC", "123"), "Bea", "Lopez", "other@example.com",
-                "Analyst", LocalDate.now())
+                "Analyst", TODAY, TODAY)
         ));
         when(employees.save(current)).thenReturn(current);
 
         assertEquals("Ana", useCase.execute(same).firstName());
         assertThrows(EmployeeNotFoundException.class, () -> useCase.execute(same));
         assertThrows(DuplicateEmployeeException.class,
-            () -> useCase.execute(employeeUpdate("other@example.com", LocalDate.now())));
+            () -> useCase.execute(employeeUpdate("other@example.com", TODAY)));
         assertThrows(InvalidEmployeeDataException.class,
             () -> useCase.execute(employeeUpdate(LocalDate.now().minusDays(1))));
-        verify(employees, times(1)).save(current);
-    }
+        verify(employees, times(1)).save(current);    }
 
     @Test
     void updateEmployeeAcceptsPartialFieldsAndRequiresAtLeastOne() {
@@ -369,7 +376,7 @@ class UseCasesTest {
 
     private CreateEmployeeCommand employeeCommand() {
         return new CreateEmployeeCommand(TYPE, NUMBER, "Ana", "Diaz", "ana@example.com",
-            "Analyst", LocalDate.now());
+            "Analyst", TODAY);
     }
 
     private UpdateEmployeeCommand employeeUpdate(LocalDate hireDate) {
@@ -381,7 +388,7 @@ class UseCasesTest {
     }
 
     private Employee employee() {
-        return Employee.create(DOCUMENT, "Ana", "Diaz", "ana@example.com", "Analyst", LocalDate.now());
+        return Employee.create(DOCUMENT, "Ana", "Diaz", "ana@example.com", "Analyst", TODAY, TODAY);
     }
 
     private CreateWorkShiftCommand shiftCommand() {

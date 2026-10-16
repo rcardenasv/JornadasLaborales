@@ -48,6 +48,8 @@ import java.util.List;
 @Produces("application/json")
 @Consumes("application/json")
 public class WorkShiftResource {
+    /** Subruta del endpoint de carga agrupada. */
+    private static final String BULK_PATH = "/bulk";
     private final CreateWorkShift createWorkShift;
     private final BulkCreateWorkShifts bulkCreateWorkShifts;
     private final GetWorkShift getWorkShift;
@@ -112,7 +114,7 @@ public class WorkShiftResource {
             result.createdShifts().size(),
             WorkShiftMapper.toHours(result.scheduledHours())
         );
-        String listPath = uriInfo.getPath().substring(0, uriInfo.getPath().lastIndexOf("/bulk"));
+        String listPath = uriInfo.getPath().substring(0, uriInfo.getPath().lastIndexOf(BULK_PATH));
         return Response.created(uriInfo.getAbsolutePathBuilder()
                 .replacePath(listPath)
                 .queryParam("from", request.from())

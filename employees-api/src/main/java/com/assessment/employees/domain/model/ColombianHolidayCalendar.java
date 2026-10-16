@@ -8,6 +8,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class ColombianHolidayCalendar {
+    /**
+     * Festivos con fecha fija y festivos Emiliani (se trasladan al lunes
+     * siguiente), Ley 51/1983 y Ley 904/2004.
+     */
     private static final Set<MonthDay> FIXED_HOLIDAYS = Set.of(
         MonthDay.of(1, 1),
         MonthDay.of(5, 1),
@@ -25,6 +29,16 @@ public final class ColombianHolidayCalendar {
         MonthDay.of(11, 1),
         MonthDay.of(11, 16)
     );
+    /** Jueves santo: pascua − 3 días. */
+    private static final int HOLY_THURSDAY_OFFSET_DAYS = 3;
+    /** Viernes santo: pascua − 2 días. */
+    private static final int GOOD_FRIDAY_OFFSET_DAYS = 2;
+    /** Ascensión del Señor: pascua + 43 días; 43 = 6×7 + 1 cae en lunes. */
+    private static final int ASCENSION_OFFSET_DAYS = 43;
+    /** Corpus Christi: pascua + 64 días; 64 = 9×7 + 1 cae en lunes. */
+    private static final int CORPUS_CHRISTI_OFFSET_DAYS = 64;
+    /** Sagrado Corazón: pascua + 71 días; 71 = 10×7 + 1 cae en lunes. */
+    private static final int SACRED_HEART_OFFSET_DAYS = 71;
 
     private ColombianHolidayCalendar() {
     }
@@ -55,11 +69,11 @@ public final class ColombianHolidayCalendar {
 
     private static void addEasterHolidays(int year, Set<LocalDate> holidays) {
         LocalDate easterSunday = calculateEasterSunday(year);
-        holidays.add(easterSunday.minusDays(3));
-        holidays.add(easterSunday.minusDays(2));
-        holidays.add(easterSunday.plusDays(43));
-        holidays.add(easterSunday.plusDays(64));
-        holidays.add(easterSunday.plusDays(71));
+        holidays.add(easterSunday.minusDays(HOLY_THURSDAY_OFFSET_DAYS));
+        holidays.add(easterSunday.minusDays(GOOD_FRIDAY_OFFSET_DAYS));
+        holidays.add(easterSunday.plusDays(ASCENSION_OFFSET_DAYS));
+        holidays.add(easterSunday.plusDays(CORPUS_CHRISTI_OFFSET_DAYS));
+        holidays.add(easterSunday.plusDays(SACRED_HEART_OFFSET_DAYS));
     }
 
     private static LocalDate nextMonday(LocalDate date) {

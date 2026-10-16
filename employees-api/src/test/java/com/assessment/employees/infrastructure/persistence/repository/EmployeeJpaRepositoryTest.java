@@ -96,7 +96,7 @@ class EmployeeJpaRepositoryTest {
 
     private Employee employee() {
         return Employee.create(Document.of("PA", "EMP001"), "Ana", "Diaz", "ana@example.com",
-            "Analyst", LocalDate.now());
+            "Analyst", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 1));
     }
 
     private EmployeeEntity entity() {

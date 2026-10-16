@@ -16,17 +16,26 @@ import com.assessment.employees.domain.repository.WorkShiftRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 
+import java.time.Clock;
+
 /**
  * Configuration for application services.
  * Produces and wires use cases with their dependencies.
  */
 @ApplicationScoped
 public class UseCaseConfig {
-    
+
+    /** Reloj compartido para reglas que dependen de la fecha actual. */
     @Produces
     @ApplicationScoped
-    public CreateEmployee createEmployee(EmployeeRepository repository) {
-        return new CreateEmployee(repository);
+    public Clock clock() {
+        return Clock.systemDefaultZone();
+    }
+
+    @Produces
+    @ApplicationScoped
+    public CreateEmployee createEmployee(EmployeeRepository repository, Clock clock) {
+        return new CreateEmployee(repository, clock);
     }
     
     @Produces

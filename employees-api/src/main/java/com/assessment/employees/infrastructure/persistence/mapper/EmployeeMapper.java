@@ -14,7 +14,7 @@ public final class EmployeeMapper {
     private EmployeeMapper() {}
     
     public static Employee toDomain(EmployeeEntity entity) {
-        return new Employee(
+        return Employee.reconstitute(
             new EmployeeId(entity.getId()),
             Document.of(entity.getDocumentType(), entity.getDocumentNumber()),
             entity.getFirstName(),

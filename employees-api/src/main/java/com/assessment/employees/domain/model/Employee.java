@@ -9,6 +9,10 @@ import java.time.LocalDate;
  * Represents a worker in the system.
  */
 public class Employee {
+    /** Longitud permitida para nombre, apellido y cargo. */
+    private static final int MIN_TEXT_LENGTH = 1;
+    private static final int MAX_TEXT_LENGTH = 100;
+
     private final EmployeeId id;
     private final Document document;
     private String firstName;
@@ -18,7 +22,8 @@ public class Employee {
     private final LocalDate hireDate;
     
     public Employee(EmployeeId id, Document document, String firstName,
-                   String lastName, Email email, String position, LocalDate hireDate) {
+                    String lastName, Email email, String position, LocalDate hireDate,
+                    LocalDate currentDate) {
         this.id = id;
         this.document = document;
         this.firstName = firstName;
@@ -26,33 +31,29 @@ public class Employee {
         this.email = email;
         this.position = position;
         this.hireDate = hireDate;
-        
-        validate();
+
+        validate(currentDate);
     }
     
-    private void validate() {
+    private void validate(LocalDate currentDate) {
         if (id == null || document == null || email == null) {
             throw new InvalidEmployeeDataException("La identidad, el documento y el correo son obligatorios.");
         }
-        if (firstName == null || firstName.isBlank() || firstName.length() > 100) {
-            throw new InvalidEmployeeDataException("El nombre debe tener entre 1 y 100 caracteres.");
-        }
-        if (lastName == null || lastName.isBlank() || lastName.length() > 100) {
-            throw new InvalidEmployeeDataException("El apellido debe tener entre 1 y 100 caracteres.");
-        }
-        if (position == null || position.isBlank() || position.length() > 100) {
-            throw new InvalidEmployeeDataException("El cargo debe tener entre 1 y 100 caracteres.");
-        }
+        requireText(firstName, "nombre");
+        requireText(lastName, "apellido");
+        requireText(position, "cargo");
         if (hireDate == null) {
             throw new InvalidEmployeeDataException("La fecha de contratación es obligatoria.");
         }
-        if (hireDate.isAfter(LocalDate.now())) {
+        if (currentDate != null && hireDate.isAfter(currentDate)) {
             throw new InvalidEmployeeDataException("La fecha de contratación no puede ser futura.");
         }
     }
     
+    /** Crea un empleado nuevo validando que `hireDate` no sea futura respecto de `currentDate`. */
     public static Employee create(Document document, String firstName, String lastName,
-                                  String email, String position, LocalDate hireDate) {
+                                  String email, String position, LocalDate hireDate,
+                                  LocalDate currentDate) {
         return new Employee(
             EmployeeId.random(),
             document,
@@ -60,8 +61,16 @@ public class Employee {
             lastName,
             new Email(email),
             position,
-            hireDate
+            hireDate,
+            currentDate
         );
+    }
+
+    /** Reconstruye un empleado ya persistido: sus invariantes fueron validados al escribir. */
+    public static Employee reconstitute(EmployeeId id, Document document, String firstName,
+                                        String lastName, Email email, String position,
+                                        LocalDate hireDate) {
+        return new Employee(id, document, firstName, lastName, email, position, hireDate, null);
     }
 
     /** Actualiza los campos editables: solo los valores no nulos cambian. */
@@ -94,14 +103,14 @@ public class Employee {
 
     private void validateEditableFields(String firstName, String lastName,
                                         String email, String position) {
-        if (firstName != null && (firstName.isBlank() || firstName.length() > 100)) {
-            throw new InvalidEmployeeDataException("El nombre debe tener entre 1 y 100 caracteres.");
+        if (firstName != null) {
+            requireText(firstName, "nombre");
         }
-        if (lastName != null && (lastName.isBlank() || lastName.length() > 100)) {
-            throw new InvalidEmployeeDataException("El apellido debe tener entre 1 y 100 caracteres.");
+        if (lastName != null) {
+            requireText(lastName, "apellido");
         }
-        if (position != null && (position.isBlank() || position.length() > 100)) {
-            throw new InvalidEmployeeDataException("El cargo debe tener entre 1 y 100 caracteres.");
+        if (position != null) {
+            requireText(position, "cargo");
         }
         if (email != null) {
             try {
@@ -109,6 +118,13 @@ public class Employee {
             } catch (IllegalArgumentException exception) {
                 throw new InvalidEmployeeDataException("El correo electrónico no tiene un formato válido.");
             }
+        }
+    }
+
+    private static void requireText(String value, String fieldLabel) {
+        if (value == null || value.isBlank() || value.length() > MAX_TEXT_LENGTH) {
+            throw new InvalidEmployeeDataException("El " + fieldLabel + " debe tener entre "
+                + MIN_TEXT_LENGTH + " y " + MAX_TEXT_LENGTH + " caracteres.");
         }
     }
     

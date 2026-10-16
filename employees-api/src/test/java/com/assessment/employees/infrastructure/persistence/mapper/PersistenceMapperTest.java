@@ -17,7 +17,7 @@ class PersistenceMapperTest {
     @Test
     void mapsEmployeeToEntityAndBack() {
         Employee employee = Employee.create(Document.of("PA", "EMP001"), "Ana", "Diaz",
-            "ana@example.com", "Analyst", LocalDate.now());
+            "ana@example.com", "Analyst", LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 1));
         EmployeeEntity entity = EmployeeMapper.toEntity(employee);
         Employee restored = EmployeeMapper.toDomain(entity);
         assertEquals(employee.getId().value(), entity.getId());

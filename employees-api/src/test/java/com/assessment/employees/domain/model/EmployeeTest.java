@@ -6,10 +6,12 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EmployeeTest {
+    private static final LocalDate TODAY = LocalDate.of(2026, 3, 1);
+
     @Test
     void shouldCreateEmployee() {
         Employee emp = Employee.create(Document.of("PA", "DOC123"), "John", "Doe",
-            "john@test.com", "Dev", LocalDate.now());
+            "john@test.com", "Dev", TODAY, TODAY);
         assertNotNull(emp.getId());
         assertEquals("DOC123", emp.getDocumentNumber());
         assertEquals(DocumentType.PA, emp.getDocumentType());
@@ -23,7 +25,8 @@ class EmployeeTest {
             "Diaz",
             "ana@example.com",
             "Analyst",
-            LocalDate.now()
+            LocalDate.of(2020, 1, 3),
+            TODAY
         );
 
         assertEquals(DocumentType.CC, employee.getDocumentType());
@@ -39,6 +42,19 @@ class EmployeeTest {
     }
 
     @Test
+    void shouldRejectFutureHireDates() {
+        assertThrows(InvalidEmployeeDataException.class, () -> Employee.create(
+            Document.of("CC", "123456"),
+            "Ana",
+            "Diaz",
+            "ana@example.com",
+            "Analyst",
+            TODAY.plusDays(1),
+            TODAY
+        ));
+    }
+
+    @Test
     void shouldKeepDocumentAndHireDateImmutableOnUpdate() {
         LocalDate hireDate = LocalDate.of(2020, 1, 1);
         Employee employee = Employee.create(
@@ -47,7 +63,8 @@ class EmployeeTest {
             "Diaz",
             "ana@example.com",
             "Analyst",
-            hireDate
+            hireDate,
+            TODAY
         );
 
         assertThrows(InvalidEmployeeDataException.class, () -> employee.update(
@@ -70,7 +87,8 @@ class EmployeeTest {
             "Diaz",
             "ana@example.com",
             "Analyst",
-            LocalDate.of(2020, 1, 1)
+            LocalDate.of(2020, 1, 1),
+            TODAY
         );
 
         employee.update(null, null, null, "Senior Analyst");
@@ -89,7 +107,8 @@ class EmployeeTest {
             "Diaz",
             "ana@example.com",
             "Analyst",
-            LocalDate.of(2020, 1, 1)
+            LocalDate.of(2020, 1, 1),
+            TODAY
         );
 
         assertThrows(InvalidEmployeeDataException.class, () -> employee.update("", null, null, null));
