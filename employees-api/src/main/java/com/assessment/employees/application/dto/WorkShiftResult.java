@@ -9,11 +9,10 @@ import com.assessment.employees.domain.model.ShiftType;
 
 /**
  * Result object for work shift operations.
+ * No expone el documento del empleado: viaja en la URL de la colección.
  */
 public record WorkShiftResult(
     UUID id,
-    String documentType,
-    String documentNumber,
     LocalDate date,
     LocalTime startTime,
     LocalTime endTime,
@@ -26,8 +25,6 @@ public record WorkShiftResult(
     public static WorkShiftResult fromDomain(com.assessment.employees.domain.model.WorkShift workShift) {
         return new WorkShiftResult(
             workShift.getId(),
-            workShift.getEmployeeDocument().type().name(),
-            workShift.getEmployeeDocument().number(),
             workShift.getDate(),
             workShift.getStartTime(),
             workShift.getEndTime(),

@@ -9,14 +9,26 @@ import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequ
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.WorkShiftResponse;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.UUID;
 
 /**
  * Mapper between REST DTOs and application DTOs.
+ * The hours reported in the API are decimal with two places (HALF_UP),
+ * calculated from the exact minutes of the domain.
  */
 public final class WorkShiftMapper {
-    
+
+    private static final int HOURS_SCALE = 2;
+
     private WorkShiftMapper() {}
+
+    public static BigDecimal toHours(Duration duration) {
+        return BigDecimal.valueOf(duration.toMinutes())
+            .divide(BigDecimal.valueOf(60), HOURS_SCALE, RoundingMode.HALF_UP);
+    }
     
     public static CreateWorkShiftCommand toCommand(String documentType, String documentNumber,
                                                     CreateWorkShiftRequest request) {
@@ -58,16 +70,14 @@ public final class WorkShiftMapper {
     public static WorkShiftResponse toResponse(WorkShiftResult result) {
         return new WorkShiftResponse(
             result.id(),
-            result.documentType(),
-            result.documentNumber(),
             result.date(),
             result.startTime(),
             result.endTime(),
-            result.workedHours(),
             result.dayType(),
             result.shiftType(),
-            result.daytimeHours(),
-            result.nighttimeHours()
+            toHours(result.workedHours()),
+            toHours(result.daytimeHours()),
+            toHours(result.nighttimeHours())
         );
     }
 }

@@ -10,6 +10,7 @@ import com.assessment.employees.infrastructure.rest.dto.UpdateEmployeeRequest;
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -44,7 +45,7 @@ class RestMapperTest {
         LocalTime end = LocalTime.of(17, 0);
         CreateWorkShiftRequest create = new CreateWorkShiftRequest(date, start, end);
         UpdateWorkShiftRequest update = new UpdateWorkShiftRequest(date, start, end);
-        WorkShiftResult result = new WorkShiftResult(id, documentType, documentNumber, date, start, end,
+        WorkShiftResult result = new WorkShiftResult(id, date, start, end,
             Duration.ofHours(8), Duration.ofHours(8), Duration.ZERO, DayType.ORDINARIO, ShiftType.DIURNA);
 
         assertEquals(documentType, WorkShiftMapper.toCommand(documentType, documentNumber, create).documentType());
@@ -52,5 +53,8 @@ class RestMapperTest {
         assertEquals(id, WorkShiftMapper.toCommand(id, documentType, documentNumber, update).id());
         assertEquals(id, WorkShiftMapper.toResponse(result).id());
         assertEquals(ShiftType.DIURNA, WorkShiftMapper.toResponse(result).shiftType());
+        assertEquals(new BigDecimal("8.00"), WorkShiftMapper.toResponse(result).workedHours());
+        assertEquals(new BigDecimal("0.00"), WorkShiftMapper.toResponse(result).nighttimeHours());
+        assertEquals(new BigDecimal("7.50"), WorkShiftMapper.toHours(Duration.ofMinutes(450)));
     }
 }

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -98,8 +99,17 @@ class WorkShiftResourceTest {
             "2026-10-01", null).getEntity();
 
         assertEquals(1, response.shifts().size());
-        assertEquals(Duration.ofHours(8), response.totalWorkedHours());
-        assertEquals(Duration.ofHours(8), response.weeklySummaries().get(0).scheduledHours());
+        assertEquals(new BigDecimal("8.00"), response.totalWorkedHours());
+        assertEquals(new BigDecimal("8.00"),
+            response.weeklySummaries().get(0).scheduledHours());
+        assertEquals(new BigDecimal("42.00"),
+            response.weeklySummaries().get(0).ordinaryLimitHours());
+        assertEquals(new BigDecimal("0.00"),
+            response.weeklySummaries().get(0).overtimeHours());
+        assertEquals(new BigDecimal("34.00"),
+            response.weeklySummaries().get(0).remainingOrdinaryHours());
+        assertEquals(new BigDecimal("8.00"), response.shifts().get(0).workedHours());
+        assertEquals(new BigDecimal("0.00"), response.shifts().get(0).nighttimeHours());
         assertThrows(IllegalArgumentException.class,
             () -> resource.list(TYPE, NUMBER, "yesterday", null));
     }

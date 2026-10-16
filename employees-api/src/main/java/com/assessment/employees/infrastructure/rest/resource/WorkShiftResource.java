@@ -4,6 +4,7 @@ import com.assessment.employees.application.dto.UpdateWorkShiftCommand;
 import com.assessment.employees.application.dto.WorkShiftListResult;
 import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.application.dto.BulkCreateWorkShiftsResult;
+import com.assessment.employees.application.dto.WeeklyWorkloadSummaryResult;
 import com.assessment.employees.application.usecase.BulkCreateWorkShifts;
 import com.assessment.employees.application.usecase.CreateWorkShift;
 import com.assessment.employees.application.usecase.DeleteWorkShift;
@@ -110,7 +111,7 @@ public class WorkShiftResource {
         BulkCreateWorkShiftsResponse response = new BulkCreateWorkShiftsResponse(
             result.createdShifts().stream().map(WorkShiftMapper::toResponse).toList(),
             result.createdShifts().size(),
-            result.scheduledHours()
+            WorkShiftMapper.toHours(result.scheduledHours())
         );
         String listPath = uriInfo.getPath().substring(0, uriInfo.getPath().lastIndexOf("/bulk"));
         return Response.created(uriInfo.getAbsolutePathBuilder()
@@ -145,24 +146,25 @@ public class WorkShiftResource {
             .map(WorkShiftMapper::toResponse)
             .toList();
         Duration totalHours = sum(results, WorkShiftResult::workedHours);
-        Duration daytimeHours = sum(results, WorkShiftResult::daytimeHours);
-        Duration nighttimeHours = sum(results, WorkShiftResult::nighttimeHours);
         return Response.ok(new WorkShiftListResponse(
-            responses, totalHours, daytimeHours, nighttimeHours,
-            listResult.weeklySummaries().stream().map(summary -> {
-                LocalDate weekStart = summary.weekStart();
-                WeekFields iso = WeekFields.ISO;
-                return new WeeklySummaryResponse(
-                    "%d-W%02d".formatted(weekStart.get(iso.weekBasedYear()),
-                        weekStart.get(iso.weekOfWeekBasedYear())),
-                    weekStart,
-                    weekStart.plusDays(6),
-                    summary.scheduledHours(),
-                    summary.ordinaryLimitHours(),
-                    summary.remainingOrdinaryHours()
-                );
-            }).toList()
+            responses, WorkShiftMapper.toHours(totalHours),
+            listResult.weeklySummaries().stream().map(WorkShiftResource::toSummaryResponse).toList()
         )).build();
+    }
+
+    private static WeeklySummaryResponse toSummaryResponse(WeeklyWorkloadSummaryResult summary) {
+        LocalDate weekStart = summary.weekStart();
+        WeekFields iso = WeekFields.ISO;
+        return new WeeklySummaryResponse(
+            "%d-W%02d".formatted(weekStart.get(iso.weekBasedYear()),
+                weekStart.get(iso.weekOfWeekBasedYear())),
+            weekStart,
+            weekStart.plusDays(6),
+            WorkShiftMapper.toHours(summary.scheduledHours()),
+            WorkShiftMapper.toHours(summary.ordinaryLimitHours()),
+            WorkShiftMapper.toHours(summary.overtimeHours()),
+            WorkShiftMapper.toHours(summary.remainingOrdinaryHours())
+        );
     }
 
     @GET

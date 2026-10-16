@@ -144,8 +144,7 @@ class UseCasesTest {
         CreateWorkShift useCase = new CreateWorkShift(shifts, employees);
 
         WorkShiftResult result = useCase.execute(command);
-        assertEquals(TYPE, result.documentType());
-        assertEquals(NUMBER, result.documentNumber());
+        assertEquals(command.startTime(), result.startTime());
 
         WorkShift overlapping = shift();
         when(shifts.findByEmployeeDocumentAndDateRange(eq(DOCUMENT), any(), any()))
