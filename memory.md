@@ -50,6 +50,7 @@
 
 ## Verificacion actual
 - **PUT parcial de empleados ok (2026-10-16)**: `UpdateEmployeeRequest` con campos opcionales, `Employee.update` omite nulos y valida solo los presentes, `UpdateEmployee` exige >=1 campo, unicidad de email solo si se envia y hireDate solo si viene; `verify` verde con **74 unitarias + 2 IT**.
+- **Demo en vivo del PUT parcial (2026-10-16)**: imagen redesplegada (`docker compose up -d --build app`); contra `CC/10000001` el PUT con solo `position` devolvio 200 actualizando el campo y conservando el resto, la restitucion devolvio 200 y el body vacio devolvio 400 con "Debe enviar al menos un campo a actualizar." Nota operativa: desde PowerShell, los bodies JSON hacia `curl.exe` deben pasarse con `@archivo` porque el quoting nativo destruye las comillas dobles (provoca 400 falsos por JSON invalido).
 - Cobertura JaCoCo post-PUT parcial: **95.83% (920/960)** — domain 93.65% (354/378), application 97.81% (268/274), infrastructure 96.75% (298/308).
 - Post-Frente 3: `mvnw.cmd -f employees-api/pom.xml clean test/verify` con `TEST_DB_DEV_SERVICES=false` y PostgreSQL de Compose en `employees_api_v2`: **BUILD SUCCESS** (ver numero de pruebas actualizado arriba).
 - `EmployeeResourceIT` verifica alta, consulta, listado y borrado por documento, crea/consulta una jornada con el contrato `HH:mm`/horas decimales y confirma 404 de la jornada tras borrar al empleado (cascada). El segundo IT verifica bulk, resumen semanal con `ordinaryLimitHours`/`overtimeHours` y rechazo 409 atomico (sin persistencia parcial) ante duplicados del bulk.
