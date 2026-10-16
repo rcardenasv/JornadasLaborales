@@ -112,7 +112,7 @@ public class EmployeeResource {
     
     @PUT
     @Path("/{documentType}/{documentNumber}")
-    @Operation(summary = "Actualizar empleado", description = "Reemplaza todos los datos editables del empleado.")
+    @Operation(summary = "Actualizar empleado", description = "Actualiza solo los campos enviados; los omitidos conservan su valor.")
     @APIResponses({
         @APIResponse(responseCode = "200", description = "Empleado actualizado"),
         @APIResponse(responseCode = "400", description = "Documento o datos inválidos"),

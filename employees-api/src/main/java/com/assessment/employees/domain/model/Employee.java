@@ -72,10 +72,18 @@ public class Employee {
     
     public void update(String firstName, String lastName, String email, String position) {
         validateEditableFields(firstName, lastName, email, position);
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = new Email(email);
-        this.position = position;
+        if (firstName != null) {
+            this.firstName = firstName;
+        }
+        if (lastName != null) {
+            this.lastName = lastName;
+        }
+        if (email != null) {
+            this.email = new Email(email);
+        }
+        if (position != null) {
+            this.position = position;
+        }
     }
 
     public void update(String documentNumber, String firstName, String lastName,
@@ -91,12 +99,22 @@ public class Employee {
 
     private void validateEditableFields(String firstName, String lastName,
                                         String email, String position) {
-        if (firstName == null || firstName.isBlank() || firstName.length() > 100
-                || lastName == null || lastName.isBlank() || lastName.length() > 100
-                || position == null || position.isBlank() || position.length() > 100) {
-            throw new InvalidEmployeeDataException("Los nombres y el cargo deben tener entre 1 y 100 caracteres.");
+        if (firstName != null && (firstName.isBlank() || firstName.length() > 100)) {
+            throw new InvalidEmployeeDataException("El nombre debe tener entre 1 y 100 caracteres.");
         }
-        new Email(email);
+        if (lastName != null && (lastName.isBlank() || lastName.length() > 100)) {
+            throw new InvalidEmployeeDataException("El apellido debe tener entre 1 y 100 caracteres.");
+        }
+        if (position != null && (position.isBlank() || position.length() > 100)) {
+            throw new InvalidEmployeeDataException("El cargo debe tener entre 1 y 100 caracteres.");
+        }
+        if (email != null) {
+            try {
+                new Email(email);
+            } catch (IllegalArgumentException exception) {
+                throw new InvalidEmployeeDataException("El correo electrónico no tiene un formato válido.");
+            }
+        }
     }
     
     // Getters

@@ -6,7 +6,7 @@
 - No agregar dependencias no aprobadas. No usar Lombok, MapStruct ni generadores.
 - La API no tiene frontend propio; Swagger UI es la interfaz de demostracion.
 - Identidad publica y de dominio del empleado: `(documentType, documentNumber)`, con tipos CC/CE/PA. UUID queda como PK interna de empleado. El UUID de jornada sigue siendo publico.
-- `hireDate` y documento son inmutables despues de crear al empleado.
+- `hireDate` y documento son inmutables despues de crear al empleado. El PUT del empleado es **parcial**: `firstName`, `lastName`, `email` y `position` son opcionales (se actualizan solo los enviados, omitido conserva el valor); body sin campos → 400; `hireDate` omitible (si se envia y difiere → 400). Decisión confirmada por el usuario 2026-10-16.
 - Jornadas colombianas: calendario legal, horas diurnas/nocturnas por vigencia (`DayNightPolicy`), cruces de medianoche, solapes por intervalo real y control semanal por semana ISO con limites por vigencia (`WeeklyWorkloadPolicy`): 48/47/46/44/42 h segun Ley 2101 de 2021; el exceso sobre el limite es `overtimeHours` y solo 409 si supera 12 h extra (art. 22 Ley 50/1990 mod. Ley 2466/2025). No se valida el tope diario de 2 h extra (supuesto confirmado).
 - El GET de jornadas incorpora totales y `weeklySummaries`; la carga bulk valida todo antes de persistir y usa `saveAll` transaccional.
 - El README de `employees-api` es la documentacion de entrega; esta memoria es solo seguimiento operativo.
@@ -49,8 +49,9 @@
 - La ejecucion contra la base de desarrollo existente fallo intencionalmente en este guard y la migracion PostgreSQL transaccional fue revertida. `verify` se corrio despues contra una base aislada temporal de PostgreSQL de Compose, vacia; esa base temporal fue eliminada tras las pruebas.
 
 ## Verificacion actual
-- Post-Frente 3: `mvnw.cmd -f employees-api/pom.xml clean test/verify` con `TEST_DB_DEV_SERVICES=false` y PostgreSQL de Compose en `employees_api_v2`: **BUILD SUCCESS**, 69 unitarias + 2 IT, cero fallos.
-- JaCoCo unitario: **95.62% (896/937 lineas)**. Por capa: domain 93.09%, application 97.75%, infrastructure 96.75%. El check del build aplica el umbral de 80% de lineas al bundle.
+- **PUT parcial de empleados ok (2026-10-16)**: `UpdateEmployeeRequest` con campos opcionales, `Employee.update` omite nulos y valida solo los presentes, `UpdateEmployee` exige >=1 campo, unicidad de email solo si se envia y hireDate solo si viene; `verify` verde con **74 unitarias + 2 IT**.
+- Cobertura JaCoCo post-PUT parcial: **95.83% (920/960)** — domain 93.65% (354/378), application 97.81% (268/274), infrastructure 96.75% (298/308).
+- Post-Frente 3: `mvnw.cmd -f employees-api/pom.xml clean test/verify` con `TEST_DB_DEV_SERVICES=false` y PostgreSQL de Compose en `employees_api_v2`: **BUILD SUCCESS** (ver numero de pruebas actualizado arriba).
 - `EmployeeResourceIT` verifica alta, consulta, listado y borrado por documento, crea/consulta una jornada con el contrato `HH:mm`/horas decimales y confirma 404 de la jornada tras borrar al empleado (cascada). El segundo IT verifica bulk, resumen semanal con `ordinaryLimitHours`/`overtimeHours` y rechazo 409 atomico (sin persistencia parcial) ante duplicados del bulk.
 - Los IT no cubren todavia todos los once endpoints ni sus errores por HTTP (ronda posterior). Las pruebas de recursos REST existentes son unitarias.
 - Dev Services sigue habilitado por defecto, pero no se valido debido a incompatibilidad del cliente Docker de Quarkus 3.8.5 con la API del daemon disponible.

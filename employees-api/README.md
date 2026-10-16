@@ -38,7 +38,7 @@ Prefijo: `/api/v1`. Los errores se responden como `application/problem+json`. Lo
 | POST | `/employees` | Crea un empleado |
 | GET | `/employees?page=0&size=20` | Lista empleados paginados (`size` máximo 100) |
 | GET | `/employees/{documentType}/{documentNumber}` | Obtiene un empleado por documento |
-| PUT | `/employees/{documentType}/{documentNumber}` | Actualiza los campos editables; documento y `hireDate` son inmutables |
+| PUT | `/employees/{documentType}/{documentNumber}` | Actualización parcial: solo los campos enviados se actualizan; documento y `hireDate` inmutables |
 | DELETE | `/employees/{documentType}/{documentNumber}` | Elimina empleado y jornadas asociadas |
 | POST | `/employees/{documentType}/{documentNumber}/work-shifts` | Agrega una jornada |
 | GET | `/employees/{documentType}/{documentNumber}/work-shifts` | Lista jornadas y resúmenes semanales; acepta `from` y `to` |
@@ -107,9 +107,14 @@ Consultar por documento:
 curl "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER"
 ```
 
-Actualizar con reemplazo completo:
+Actualizar (parcial): solo los campos enviados se actualizan; los omitidos conservan su valor. Si se envía `hireDate`, debe coincidir con la actual (no es modificable); un body sin ningún campo devuelve `400`:
 
 ```bash
+curl -i -X PUT "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER" \
+  -H 'Content-Type: application/json' \
+  -d '{"position":"Senior Analyst"}'
+
+# También se acepta el body completo (equivalente a una actualización con todos los campos):
 curl -i -X PUT "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER" \
   -H 'Content-Type: application/json' \
   -d '{"firstName":"Ana","lastName":"Diaz","email":"ana.diaz@example.com","position":"Senior Analyst","hireDate":"2026-10-14"}'
@@ -213,7 +218,7 @@ Ejecutar unitarias, integración y el control de cobertura:
 .\mvnw.cmd verify
 ```
 
-La ejecución integral del Frente 3 terminó correctamente: `verify` ejecutó **69 pruebas unitarias y 2 IT**, todas sin fallos, y JaCoCo aplicó el umbral de 80 %. JaCoCo midió **95,62% de líneas unitarias (896/937)**; por capa: domain **93,09%** (337/362), application **97,75%** (261/267) e infrastructure **96,75%** (298/308). Las pruebas nuevas cubren las vigencias del límite ordinario (47 h en 2024-W28 y 46 h en 2024-W29; 44 h en 2025-W29; 42 h en 2026-W29 y 2026-W42), el tope de horas extra (46 h reportan 4 extra y pasan; 55 h devuelven 409; 54 h exactas pasan), la ventana diurna/nocturna por fecha (18:00–22:00 deja 1 h nocturna el 2025-12-24 y 3 h el 2025-12-25; la misma ventana de la fecha de inicio aplica en turnos que cruzan medianoche) y la respuesta en horas decimales. Failsafe no instrumenta el proceso de integración, por lo que los IT no incrementan la cobertura. `EmployeeResourceIT` valida el CRUD de empleado, la creación/consulta de una jornada (con horas decimales y `HH:mm`) y que al borrar al empleado la FK en cascada elimine la jornada; además, valida la carga bulk, el resumen semanal con `ordinaryLimitHours`/`overtimeHours` y que un bulk conflictivo responda 409 sin persistir jornadas parciales. No hay todavía pruebas HTTP de integración para todos los once endpoints ni para todos sus errores. La suite se ejecutó contra PostgreSQL de Compose (`employees_api_v2`, Flyway en V5) porque Dev Services no se pudo validar por incompatibilidad con la API Docker disponible.
+La ejecución integral del Frente 3 terminó correctamente: `verify` ejecutó **74 pruebas unitarias y 2 IT**, todas sin fallos, y JaCoCo aplicó el umbral de 80 %. JaCoCo midió **95,83% de líneas unitarias (920/960)**; por capa: domain **93,65%** (354/378), application **97,81%** (268/274) e infrastructure **96,75%** (298/308). Las pruebas nuevas cubren las vigencias del límite ordinario (47 h en 2024-W28 y 46 h en 2024-W29; 44 h en 2025-W29; 42 h en 2026-W29 y 2026-W42), el tope de horas extra (46 h reportan 4 extra y pasan; 55 h devuelven 409; 54 h exactas pasan), la ventana diurna/nocturna por fecha (18:00–22:00 deja 1 h nocturna el 2025-12-24 y 3 h el 2025-12-25; la misma ventana de la fecha de inicio aplica en turnos que cruzan medianoche), la respuesta en horas decimales y el **PUT parcial de empleados** (un solo campo, campos omitidos intactos, body vacío → 400, `hireDate` validado solo si se envía). Failsafe no instrumenta el proceso de integración, por lo que los IT no incrementan la cobertura. `EmployeeResourceIT` valida el CRUD de empleado, la creación/consulta de una jornada (con horas decimales y `HH:mm`) y que al borrar al empleado la FK en cascada elimine la jornada; además, valida la carga bulk, el resumen semanal con `ordinaryLimitHours`/`overtimeHours` y que un bulk conflictivo responda 409 sin persistir jornadas parciales. No hay todavía pruebas HTTP de integración para todos los once endpoints ni para todos sus errores. La suite se ejecutó contra PostgreSQL de Compose (`employees_api_v2`, Flyway en V5) porque Dev Services no se pudo validar por incompatibilidad con la API Docker disponible.
 
 `docker compose config --quiet` pasó y `docker compose build app` construyó la imagen actualizada. El Compose local se redesplegó con `employees_api_v2`; Flyway quedó en **V5** (semilla de horas extra), health respondió `200`, OpenAPI publica las once operaciones y Swagger UI carga con `200`. La base contiene tres empleados y 18 jornadas semilla (la semana 2026-W42 con 46 h → 4 h extra). Se conserva el volumen PostgreSQL entre redespliegues; al terminar la demostración, ejecuta `docker compose down` sin borrarlo.
 
@@ -333,6 +338,7 @@ Decisiones relevantes:
 | Documento como identidad pública | Refleja la identificación del empleado en las rutas; el UUID queda como detalle técnico interno. |
 | UUID para la jornada | Identifica una jornada de forma única, pero siempre se consulta bajo el documento dueño. |
 | `hireDate` y documento inmutables | Evita que un PUT cambie la identidad o la historia laboral; corregir un documento digitado incorrectamente exige eliminar y crear el registro. |
+| PUT de empleados como actualización parcial | Solo los campos enviados (`firstName`, `lastName`, `email`, `position`) se actualizan y validan; los omitidos conservan su valor y debe llegar al menos un campo (400 en caso contrario). Simplifica el uso del endpoint sin debilitar las invariantes del dominio. |
 | Clave foránea documental compuesta | Mantiene la relación de jornadas con la identidad natural del empleado y aplica cascada al borrado físico. |
 | Horas semanales ISO calculadas en dominio | Centraliza el criterio semanal y permite repartir los turnos que atraviesan medianoche sin un endpoint de resumen adicional. |
 | Parámetros legales por vigencia (`WeeklyWorkloadPolicy`, `DayNightPolicy`) | El límite ordinario (48/47/46/44/42 h, Ley 2101 de 2021) y la ventana diurna/nocturna (Ley 2466 de 2025) cambian con el tiempo; se representan como tablas de vigencias inmutables y no como constantes únicas, y se corrijen en el dominio con Java puro. |
@@ -353,7 +359,7 @@ En esta sesión utilicé GitHub Copilot integrado en VS Code, con el modelo GPT-
 
 ### 2. ¿Cómo verificaste que el código generado por IA sea correcto con tu propuesta de solución?
 
-La última ejecución integral de `verify` pasó con 69 pruebas unitarias, 2 IT y el umbral JaCoCo; la cobertura unitaria medida fue 95,62% (896/937 líneas: domain 93,09%, application 97,75% e infrastructure 96,75%). `EmployeeResourceIT` comprobó contra PostgreSQL 15 el arranque de Hibernate y Flyway, las rutas documentales del empleado, la creación/consulta de una jornada con el contrato `HH:mm` y horas decimales, el borrado en cascada, la carga bulk, el resumen semanal con `ordinaryLimitHours` y `overtimeHours`, y el rechazo atómico de una carga conflictiva. Flyway aplicó la migración V5 (semilla de horas extra) contra la base `employees_api_v2`. Durante la revisión de la base previa, V3 se detuvo de forma segura al encontrar documentos legados que requerían clasificación manual. Para el redespliegue se creó una base limpia y se eliminó la base anterior por solicitud del usuario, conservando el volumen PostgreSQL. Dev Services no se validó por incompatibilidad con la API Docker disponible. También revisé manualmente que `domain` y `application` no importen APIs de framework. La imagen redesplegada con la respuesta en horas decimales reporta health `200`, Swagger UI carga con `200` y OpenAPI publica las once operaciones.
+La última ejecución integral de `verify` pasó con 74 pruebas unitarias, 2 IT y el umbral JaCoCo; la cobertura unitaria medida fue 95,83% (920/960 líneas: domain 93,65%, application 97,81% e infrastructure 96,75%). `EmployeeResourceIT` comprobó contra PostgreSQL 15 el arranque de Hibernate y Flyway, las rutas documentales del empleado, la creación/consulta de una jornada con el contrato `HH:mm` y horas decimales, el borrado en cascada, la carga bulk, el resumen semanal con `ordinaryLimitHours` y `overtimeHours`, y el rechazo atómico de una carga conflictiva. Flyway aplicó la migración V5 (semilla de horas extra) contra la base `employees_api_v2`. Durante la revisión de la base previa, V3 se detuvo de forma segura al encontrar documentos legados que requerían clasificación manual. Para el redespliegue se creó una base limpia y se eliminó la base anterior por solicitud del usuario, conservando el volumen PostgreSQL. Dev Services no se validó por incompatibilidad con la API Docker disponible. También revisé manualmente que `domain` y `application` no importen APIs de framework. La imagen redesplegada con la respuesta en horas decimales reporta health `200`, Swagger UI carga con `200` y OpenAPI publica las once operaciones.
 
 ### 3. ¿Qué riesgos ves en utilizar código generado por IA?
 

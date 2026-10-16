@@ -60,4 +60,47 @@ class EmployeeTest {
         assertEquals(hireDate, employee.getHireDate());
         assertEquals("Senior Analyst", employee.getPosition());
     }
+
+    @Test
+    void shouldUpdateOnlyProvidedFieldsAndKeepTheOthers() {
+        Employee employee = Employee.create(
+            Document.of("CC", "123456"),
+            "Ana",
+            "Diaz",
+            "ana@example.com",
+            "Analyst",
+            LocalDate.of(2020, 1, 1)
+        );
+
+        employee.update(null, null, null, "Senior Analyst");
+
+        assertEquals("Ana", employee.getFirstName());
+        assertEquals("Diaz", employee.getLastName());
+        assertEquals("ana@example.com", employee.getEmail().value());
+        assertEquals("Senior Analyst", employee.getPosition());
+    }
+
+    @Test
+    void shouldValidateOnlyProvidedFieldsOnPartialUpdate() {
+        Employee employee = Employee.create(
+            Document.of("CC", "123456"),
+            "Ana",
+            "Diaz",
+            "ana@example.com",
+            "Analyst",
+            LocalDate.of(2020, 1, 1)
+        );
+
+        assertThrows(InvalidEmployeeDataException.class, () -> employee.update("", null, null, null));
+        assertThrows(InvalidEmployeeDataException.class, () -> employee.update(null, "x".repeat(101), null, null));
+        assertThrows(InvalidEmployeeDataException.class, () -> employee.update(null, null, "invalid-email", null));
+        assertThrows(InvalidEmployeeDataException.class, () -> employee.update(null, null, null, "  "));
+
+        employee.update("Ana Dos", null, "ana.dos@example.com", null);
+
+        assertEquals("Ana Dos", employee.getFirstName());
+        assertEquals("ana.dos@example.com", employee.getEmail().value());
+        assertEquals("Diaz", employee.getLastName());
+        assertEquals("Analyst", employee.getPosition());
+    }
 }

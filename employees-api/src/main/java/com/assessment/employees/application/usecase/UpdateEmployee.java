@@ -23,29 +23,39 @@ public class UpdateEmployee {
         Document document = Document.of(command.documentType(), command.documentNumber());
         Employee existing = repository.findByDocument(document)
             .orElseThrow(() -> new EmployeeNotFoundException(document));
-        if (!existing.getHireDate().equals(command.hireDate())) {
+        validateAtLeastOneField(command);
+        if (command.hireDate() != null && !existing.getHireDate().equals(command.hireDate())) {
             throw new InvalidEmployeeDataException("La fecha de contratación no se puede modificar.");
         }
-        
-        // Check for duplicate email (excluding current employee)
-        repository.findByEmail(command.email()).ifPresent(emp -> {
-            if (!emp.getDocument().equals(document)) {
-                throw new DuplicateEmployeeException("email", command.email());
-            }
-        });
-        
-        // Check for duplicate document number (excluding current employee)
+
+        // Check for duplicate email only when a new email is provided
+        if (command.email() != null) {
+            repository.findByEmail(command.email()).ifPresent(emp -> {
+                if (!emp.getDocument().equals(document)) {
+                    throw new DuplicateEmployeeException("email", command.email());
+                }
+            });
+        }
+
+        // Null fields keep the current value; provided fields are validated by the domain
         existing.update(
             command.firstName(),
             command.lastName(),
             command.email(),
             command.position()
         );
-        
+
         // Save to repository
         Employee updated = repository.save(existing);
-        
+
         return EmployeeResult.fromDomain(updated);
     }
 
+    private void validateAtLeastOneField(UpdateEmployeeCommand command) {
+        boolean anyEditableField = command.firstName() != null || command.lastName() != null
+            || command.email() != null || command.position() != null;
+        if (!anyEditableField) {
+            throw new InvalidEmployeeDataException("Debe enviar al menos un campo a actualizar.");
+        }
+    }
 }

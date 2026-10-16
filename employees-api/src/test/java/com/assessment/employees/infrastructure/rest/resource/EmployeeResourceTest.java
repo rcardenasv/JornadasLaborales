@@ -2,6 +2,7 @@ package com.assessment.employees.infrastructure.rest.resource;
 
 import com.assessment.employees.application.dto.EmployeePageResult;
 import com.assessment.employees.application.dto.EmployeeResult;
+import com.assessment.employees.application.dto.UpdateEmployeeCommand;
 import com.assessment.employees.application.usecase.*;
 import com.assessment.employees.infrastructure.rest.dto.CreateEmployeeRequest;
 import com.assessment.employees.infrastructure.rest.dto.PagedEmployeeResponse;
@@ -12,6 +13,7 @@ import jakarta.ws.rs.core.UriInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,6 +21,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -75,5 +78,26 @@ class EmployeeResourceTest {
         verify(updateEmployee).execute(argThat(command ->
             command.documentType().equals("CC") && command.documentNumber().equals("123456")));
         verify(deleteEmployee).execute("CC", "123456");
+    }
+
+    @Test
+    void updatePassesNullsThroughForPartialUpdate() {
+        when(updateEmployee.execute(any())).thenReturn(EMPLOYEE);
+        UpdateEmployeeRequest partial = new UpdateEmployeeRequest(
+            null, null, null, "Senior Analyst", null);
+
+        assertEquals(200, resource.update("CC", "123456", partial).getStatus());
+
+        ArgumentCaptor<UpdateEmployeeCommand> captor =
+            ArgumentCaptor.forClass(UpdateEmployeeCommand.class);
+        verify(updateEmployee).execute(captor.capture());
+        UpdateEmployeeCommand command = captor.getValue();
+        assertEquals("CC", command.documentType());
+        assertEquals("123456", command.documentNumber());
+        assertNull(command.firstName());
+        assertNull(command.lastName());
+        assertNull(command.email());
+        assertEquals("Senior Analyst", command.position());
+        assertNull(command.hireDate());
     }
 }

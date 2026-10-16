@@ -198,7 +198,7 @@ src/test/java/...         # *Test  → unitarias (JUnit 5 + Mockito, sin Quarkus
 | `hireDate` | LocalDate | Obligatorio, no futura. **Inmutable tras creación**: el PUT la exige idéntica; si difiere → 400 |
 
 - **Identidad**: la pareja `(documentType, documentNumber)` es el identificador de API y dominio (rutas, puertos, excepciones). El UUID queda como PK técnica interna de `employees`, **nunca expuesta**.
-- **PUT** actualiza `firstName`, `lastName`, `email`, `position`; tipo y número de documento van en la URL, no en el body.
+- **PUT** actualiza solo los campos enviados (`firstName`, `lastName`, `email`, `position` opcionales; omitido = conserva el valor actual; se exige al menos un campo → 400); tipo y número de documento van en la URL, no en el body, y `hireDate` es inmutable (si se envía debe coincidir; si difiere → 400).
 - Eliminación: **borrado físico real**, coherente con la operación *Delete* de un CRUD; las jornadas asociadas se eliminan en cascada vía la FK a la clave natural. No implementes borrado lógico.
 
 ### WorkShift (jornada laboral)
@@ -267,7 +267,7 @@ Prefijo base: `/api/v1`. Formato: JSON. Errores: `application/problem+json` (RFC
 | POST | `/employees` | Crear empleado. Body: `documentType`, `documentNumber`, `firstName`, `lastName`, `email`, `position`, `hireDate` | 201 (+ `Location: /employees/{documentType}/{documentNumber}`), 400, 409 |
 | GET | `/employees` | Listar con paginación (`page`, `size`) | 200 |
 | GET | `/employees/{documentType}/{documentNumber}` | Obtener por documento | 200, 400, 404 |
-| PUT | `/employees/{documentType}/{documentNumber}` | Actualizar campos editables (`firstName`, `lastName`, `email`, `position`); `hireDate` debe coincidir | 200, 400, 404, 409 |
+| PUT | `/employees/{documentType}/{documentNumber}` | Actualizar campos editables opcionales (`firstName`, `lastName`, `email`, `position`: se actualizan solo los enviados); `hireDate`, si se envía, debe coincidir | 200, 400, 404, 409 |
 | DELETE | `/employees/{documentType}/{documentNumber}` | Eliminar | 204, 404 |
 | POST | `/employees/{documentType}/{documentNumber}/work-shifts` | Agregar jornada individual | 201 (+ `Location`), 400, 404, 409 |
 | GET | `/employees/{documentType}/{documentNumber}/work-shifts` | Listar jornadas del empleado, filtro opcional `from` y `to` (ISO-8601, `yyyy-MM-dd`) | 200, 400, 404 |

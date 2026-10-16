@@ -124,6 +124,42 @@ class UseCasesTest {
     }
 
     @Test
+    void updateEmployeeAcceptsPartialFieldsAndRequiresAtLeastOne() {
+        Employee current = employee();
+        UpdateEmployee useCase = new UpdateEmployee(employees);
+        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(current));
+        when(employees.save(current)).thenReturn(current);
+
+        EmployeeResult result = useCase.execute(new UpdateEmployeeCommand(
+            TYPE, NUMBER, null, null, null, "Senior Analyst", null));
+
+        assertEquals("Senior Analyst", result.position());
+        assertEquals("Ana", result.firstName());
+        assertEquals("ana@example.com", result.email());
+        verify(employees, never()).findByEmail(any());
+
+        assertThrows(InvalidEmployeeDataException.class, () -> useCase.execute(
+            new UpdateEmployeeCommand(TYPE, NUMBER, null, null, null, null, null)));
+        verify(employees, times(1)).save(current);
+    }
+
+    @Test
+    void updateEmployeeValidatesHireDateOnlyWhenProvided() {
+        Employee current = employee();
+        UpdateEmployee useCase = new UpdateEmployee(employees);
+        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(current), Optional.of(current));
+        when(employees.save(current)).thenReturn(current);
+
+        useCase.execute(new UpdateEmployeeCommand(
+            TYPE, NUMBER, "Ana Dos", null, null, null, null));
+        assertEquals("Ana Dos", current.getFirstName());
+
+        assertThrows(InvalidEmployeeDataException.class, () -> useCase.execute(
+            new UpdateEmployeeCommand(TYPE, NUMBER, null, null, "ana@example.com",
+                null, LocalDate.now().minusDays(1))));
+    }
+
+    @Test
     void deleteEmployeeUsesDocumentAndRemovesAssociatedShifts() {
         Employee existing = employee();
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(existing), Optional.empty());
