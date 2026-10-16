@@ -11,7 +11,6 @@ import com.assessment.employees.application.usecase.DeleteWorkShift;
 import com.assessment.employees.application.usecase.GetWorkShift;
 import com.assessment.employees.application.usecase.ListEmployeeWorkShifts;
 import com.assessment.employees.application.usecase.UpdateWorkShift;
-import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsResponse;

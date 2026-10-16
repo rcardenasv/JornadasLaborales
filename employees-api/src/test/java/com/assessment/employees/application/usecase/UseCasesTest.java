@@ -80,7 +80,8 @@ class UseCasesTest {
     @Test
     void getEmployeeFindsByNaturalDocumentIdentityOrThrows() {
         Employee existing = employee();
-        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(existing), Optional.empty());
+        when(employees.findByDocument(DOCUMENT)).thenAnswer(call -> Optional.of(existing))
+            .thenAnswer(call -> Optional.empty());
         GetEmployee useCase = new GetEmployee(employees);
 
         assertEquals(NUMBER, useCase.execute(TYPE, NUMBER).documentNumber());
@@ -105,8 +106,10 @@ class UseCasesTest {
         Employee current = employee();
         UpdateEmployee useCase = new UpdateEmployee(employees);
         UpdateEmployeeCommand same = employeeUpdate(LocalDate.now());
-        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(current), Optional.empty(),
-            Optional.of(current), Optional.of(current));
+        when(employees.findByDocument(DOCUMENT)).thenAnswer(call -> Optional.of(current))
+            .thenAnswer(call -> Optional.empty())
+            .thenAnswer(call -> Optional.of(current))
+            .thenAnswer(call -> Optional.of(current));
         when(employees.findByEmail("ana@example.com")).thenReturn(Optional.of(current));
         when(employees.findByEmail("other@example.com")).thenReturn(Optional.of(
             Employee.create(Document.of("CC", "123"), "Bea", "Lopez", "other@example.com",
@@ -147,7 +150,8 @@ class UseCasesTest {
     void updateEmployeeValidatesHireDateOnlyWhenProvided() {
         Employee current = employee();
         UpdateEmployee useCase = new UpdateEmployee(employees);
-        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(current), Optional.of(current));
+        when(employees.findByDocument(DOCUMENT)).thenAnswer(call -> Optional.of(current))
+            .thenAnswer(call -> Optional.of(current));
         when(employees.save(current)).thenReturn(current);
 
         useCase.execute(new UpdateEmployeeCommand(
@@ -162,7 +166,8 @@ class UseCasesTest {
     @Test
     void deleteEmployeeUsesDocumentAndRemovesAssociatedShifts() {
         Employee existing = employee();
-        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(existing), Optional.empty());
+        when(employees.findByDocument(DOCUMENT)).thenAnswer(call -> Optional.of(existing))
+            .thenAnswer(call -> Optional.empty());
         DeleteEmployee useCase = new DeleteEmployee(employees);
 
         useCase.execute(TYPE, NUMBER);
@@ -207,8 +212,10 @@ class UseCasesTest {
 
     @Test
     void listShiftsSupportsBoundsAndRejectsMissingEmployeeOrInvertedRange() {
-        when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(employee()),
-            Optional.of(employee()), Optional.of(employee()), Optional.empty());
+        when(employees.findByDocument(DOCUMENT)).thenAnswer(call -> Optional.of(employee()))
+            .thenAnswer(call -> Optional.of(employee()))
+            .thenAnswer(call -> Optional.of(employee()))
+            .thenAnswer(call -> Optional.empty());
         when(shifts.findByEmployeeDocument(DOCUMENT)).thenReturn(List.of());
         when(shifts.findByEmployeeDocumentAndDateRange(eq(DOCUMENT), any(), any())).thenReturn(List.of());
         ListEmployeeWorkShifts useCase = new ListEmployeeWorkShifts(shifts, employees);

@@ -6,7 +6,6 @@ import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
-import java.util.UUID;
 
 /**
  * Use case for deleting a work shift.

@@ -5,7 +5,6 @@ import com.assessment.employees.domain.exception.WorkShiftNotFoundException;
 import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
-import java.util.UUID;
 
 /**
  * Use case for retrieving a work shift by ID.
