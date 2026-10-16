@@ -1,88 +1,63 @@
 # Memoria Operativa - API de Empleados y Jornadas
 
-## Contexto
-- API REST para CRUD de empleados y jornadas laborales, con PostgreSQL y Flyway.
-- Stack acordado: Java 21, Quarkus, Maven, JUnit 5, Mockito y JaCoCo.
-- La API no lleva front-end; Swagger UI es la interfaz para la demostracion.
+## Contexto y decisiones
+- Proyecto Java 21, Quarkus 3.8.5, Maven Wrapper 3.9.9, PostgreSQL/Flyway, JUnit 5/Mockito y JaCoCo.
+- Clean Architecture: `domain <- application <- infrastructure`; domain/application no importan Jakarta, Quarkus ni Jackson.
+- No agregar dependencias no aprobadas. No usar Lombok, MapStruct ni generadores.
+- La API no tiene frontend propio; Swagger UI es la interfaz de demostracion.
+- Identidad publica y de dominio del empleado: `(documentType, documentNumber)`, con tipos CC/CE/PA. UUID queda como PK interna de empleado. El UUID de jornada sigue siendo publico.
+- `hireDate` y documento son inmutables despues de crear al empleado.
+- Jornadas colombianas: calendario legal, horas diurnas/nocturnas, cruces de medianoche, solapes por intervalo real y control semanal por semana ISO (tope 42 h fijo en el codigo actual; el Frente 3 lo parametriza por vigencia y agrega horas extra con tope de 12 h/semana).
+- El GET de jornadas incorpora totales y `weeklySummaries`; la carga bulk valida todo antes de persistir y usa `saveAll` transaccional.
+- El README de `employees-api` es la documentacion de entrega; esta memoria es solo seguimiento operativo.
 
-## Reglas del Proyecto
-- Clean Architecture: domain <- application <- infrastructure.
-- Domain y application no importan Jakarta, Quarkus ni Jackson.
-- No agregar dependencias no aprobadas; no usar Lombok ni generadores de mappers.
-- Borrado fisico de empleados; jornadas con cascada en la base de datos.
-- JaCoCo debe exigir al menos 80% de cobertura unitaria. Exclusiones permitidas: `infrastructure/config/**` y `infrastructure/persistence/entity/**`.
-- README.md es la documentacion principal; memory.md mantiene el seguimiento de trabajo.
+## Implementacion completada en esta reestructuracion
+- Dominio: `Document`, `DocumentType`, `ColombianHolidayCalendar`, `DayType`, `ShiftType`, `WeeklyWorkloadPolicy` y `WeeklyHoursExceededException`.
+- `WorkShift` calcula horas trabajadas, diurnas/nocturnas, clasificacion, fecha de fin y duracion dentro de semana ISO; admite cruce de medianoche y rechaza horas iguales.
+- Empleados: casos de uso y respuestas operan por documento; PUT preserva documento y `hireDate`.
+- Persistencia: entidades y mappers adaptados a la clave natural; `work_shifts` referencia `(employee_document_type, employee_document_number)` por FK compuesta y cascada.
+- Eliminacion de empleado ahora elimina una sola entidad y confia en `ON DELETE CASCADE`; evita borrado manual de jornadas en transacciones separadas.
+- REST: rutas de empleado/jornadas por documento, DTOs enriquecidos, bulk, errores `problem+json` y once operaciones OpenAPI.
+- La carga bulk soporta rango maximo de 92 dias, weekdays omitido/vacio/cero fechas, deteccion todo-o-nada de solapes y limite semanal, fechas conflictivas en el 409 y guardado atomico.
+- El resumen semanal se calcula desde las jornadas de semanas ISO completas; turnos que cruzan el lunes se distribuyen por intervalo real.
+- V3/V4 creadas; V4 agrega jornadas partidas lunes-viernes (40 h), turno nocturno y festivo sin exceder el limite semanal.
+- `employees-api/README.md` actualizado con contrato de 11 operaciones, ejemplos, reglas colombianas, diagramas, decisiones y las cuatro correcciones del usuario en la tabla de IA.
+- Docker Compose usa variables parametrizadas para nombre de base de datos y credenciales de desarrollo.
 
-## Correcciones Aplicadas
-- El listado de empleados pagina desde el repositorio y devuelve el conteo total.
-- Las respuestas POST construyen `Location`; PUT usa los campos del body sin duplicar el ID de la ruta.
-- Los IDs de jornadas son UUID de extremo a extremo y coinciden con el esquema/seed.
-- Las escrituras JPA son transaccionales; los adaptadores usan inyeccion por constructor y `merge` para guardar.
-- El filtro de jornadas acepta `from` o `to` por separado y valida fechas y rangos.
-- La validacion de fecha de contratacion rechaza fechas futuras; los errores REST usan `application/problem+json` en espanol.
-- Se corrigieron claves de Swagger, CORS, datasource y migraciones Flyway.
-- Los updates de Employee y WorkShift validan antes de reemplazar estado.
-- Maven Failsafe ejecuta pruebas con sufijo `IT`; JaCoCo excluye solo configuracion CDI y entidades JPA simples.
-- `WorkShiftEntity.employeeId` y los parametros JPQL usan UUID, igual que la FK `work_shifts.employee_id`; asi se evita comparar `uuid` con `varchar` en PostgreSQL.
-- El Maven Wrapper oficial esta generado en modo `only-script` y fijado a Maven 3.9.9 (`employees-api/mvnw.cmd`).
-- Docker usa build multietapa y copia el artefacto fast-jar de Quarkus (`target/quarkus-app`).
-- Las diez operaciones tienen resumen, codigos documentados y parametros OpenAPI; los DTOs de entrada incluyen ejemplos.
-- Los avisos recientes en pruebas se corrigieron: `EmployeeResourceIT` reemplaza el matcher Hamcrest deprecated por aserciones JUnit; stubbings Mockito de varios valores (`TypedQuery`/`Stream`) se encadenaron para evitar arrays genericos de varargs. EmployeeJpaRepositoryTest (5) y WorkShiftJpaRepositoryTest (4) pasaron en ejecuciones focalizadas; `EmployeeResourceIT` se recompilo correctamente, pero no se ha vuelto a ejecutar desde ese cambio.
-- Las seis respuestas de uso de IA en `employees-api/README.md` ya estan redactadas sin placeholders y acotadas a esta sesion; `AGENTS.md` refleja el stack real y distingue evidencia de pendientes.
+## Redespliegue local
+- Compose usa `employees_api_v2`; Flyway aplicó V1–V4. Se eliminó la base `employees_db` por solicitud explícita tras validar la nueva; el volumen PostgreSQL quedó conservado y la base activa tiene 3 empleados y 17 jornadas semilla.
 
-## Plan Aprobado (2026-10-15): Jornadas Colombianas e Identidad por Documento
+## Estado verificado 2026-10-16 (auditoria previa al Frente 3)
+- El contrato ya tiene once endpoints y el usuario confirmo **no hacer cambios de contrato**: el GET individual por `shiftId` se conserva (diferencia con el listado: el listado devuelve todas las jornadas filtradas por fecha con `totalWorkedHours` y `weeklySummaries`; el GET individual devuelve una jornada por UUID sin agregados; retirarlo romperia la simetria con PUT/DELETE y evaluo el usuario la simplificacion descartada).
+- **Frente 3 verificado en 0 %** en el codigo: limite semanal `MAX_WEEKLY_HOURS = 42` fijo en `WeeklyWorkloadPolicy` (rechaza por encima sin concepto de horas extra; el mensaje hardcodea "42 horas"); ventana diurna/nocturna hardcodeada 06:00–21:00 como constantes en `WorkShift` (no existe `DayNightPolicy`); no existe `overtimeHours` en ninguna capa; resumen semanal tiene solo `weekStart`/`scheduledHours` y el REST computa `maxWeeklyHours`/`remainingHours` en el recurso; duraciones serializadas en segundos (`28800.0f` en el IT) y sin `HH:mm`; el listado aun trae `totalDaytimeHours`/`totalNighttimeHours` y cada jornada repite `documentType`/`documentNumber`; no existe `V5__overtime_seed_data.sql`.
+- Los tests actuales cubren reparto domingo→lunes entre semanas ISO y rechazo del tope fijo, pero ninguna fecha frontera de vigencia (2023/2024/2025/2026-07-15) ni cambio de ventana (2025-12-24/25) ni semantica de extra.
 
-El usuario aprobo dos frentes de cambio. AGENTS.md (secciones 1, 4, 5, 7, 8 y 13) es la especificacion objetivo; el estado previo (UUID como identidad, sin cruce de medianoche, sin tope semanal) queda obsoleto al terminar la reestructuracion.
+## Plan Frente 3 aprobado (2026-10-16)
+- Supuestos confirmados por el usuario: (a) superar el limite ordinario se **informa** como horas extra (no bloquea); solo 409 si las extra superan **12 h** por semana. (b) No se valida el tope diario de 2 h extra.
+- Semilla de la semana con extra en `V5__overtime_seed_data.sql` **nueva migracion**, porque V4 ya fue aplicada en `employees_api_v2` y editarla romperia el checksum de Flyway. Ejemplo objetivo: 46 h programadas en 2026 → `ordinaryLimitHours` 42.00, `overtimeHours` 4.00, `remainingOrdinaryHours` 0.00.
+- Incrementos con pruebas en verde por paso: **3.1** `WeeklyWorkloadPolicy` por vigencias (48/47/46/44/42; limite de la semana ISO segun su domingo) + `DayNightPolicy` por fecha (diurna hasta 2025-12-24 06:00–21:00; desde 2025-12-25 06:00–19:00) con tests en fechas frontera; **3.2** `WorkShift` usa la policy, resumen con limite/extra/restante calculado en dominio (sale del recurso), `WeeklyHoursExceededException` y bulk con el criterio nuevo; **3.3** REST: horas decimales escala 2 `HALF_UP`, `HH:mm`, sin documento por jornada ni totales diurno/nocturno, `weeklySummaries` renombrado + `overtimeHours`, OpenAPI con `@Schema` y ejemplos (bulk y cruce de medianoche); **3.4** V5, `verify` integral, README (tabla de vigencias, fuentes, aviso no-asesoria-legal, curl nuevo, fila (5) de IA) y demo Docker con `compose down` al final.
+- Alcance: solo Frente 3 en esta ronda; los IT HTTP de los once endpoints y sus errores quedan para una ronda posterior.
 
-**Jornadas aterrizadas a Colombia:**
-- Clasificacion calculada por el dominio: dayType (ORDINARIO/DOMINICAL/FESTIVO), shiftType (DIURNA/NOCTURNA/MIXTA), daytimeHours (06:00-21:00) y nighttimeHours (21:00-06:00).
-- ColombianHolidayCalendar en dominio, Java puro, sin dependencias nuevas: fijos, Semana Santa, pascuales al lunes y Emiliani (Ley 904/2004).
-- Turnos que cruzan medianoche: endTime < startTime = termina al dia siguiente; endTime == startTime -> 400. Solape por intervalo real con consultas extendidas un dia atras.
-- Tope 42 h por semana ISO (Ley 2101, vigente desde 1-jul-2026), horas cortadas en lunes 00:00; exceder -> WeeklyHoursExceededException -> 409.
-- POST .../work-shifts/bulk por empleado: from/to + weekdays + una franja; todo-o-nada (409 con fechas conflictivas, no crea nada); rango maximo 92 dias; weekdays vacio o cero jornadas -> 400.
-- weeklySummaries visibles en el GET de jornadas (semanas ISO completas tocadas por el rango): scheduledHours, maxWeeklyHours=42h, remainingHours. Sin endpoint de resumen separado.
-- Pausas no modeladas: almuerzo = dos jornadas; documentarlo en README.
+## Migracion de datos legados
+- La base anterior no guardaba tipo de documento. V3 transforma las tres semillas conocidas a documentos numericos CC y asigna CC como backfill inicial.
+- El usuario eligio **mapeo manual explicito** para documentos alfanumericos legados no reconocidos; no se debe inferir PA u otro tipo automaticamente.
+- V3 incluye un guard que aborta si quedan documentos que no cumplen el formato numerico CC/CE. La base legada `employees_db` se eliminó por solicitud explícita al redesplegar sobre `employees_api_v2`; para importar otra base legada, confirmar los tipos reales y mapearlos antes de V3. El volumen PostgreSQL no se eliminó.
+- La ejecucion contra la base de desarrollo existente fallo intencionalmente en este guard y la migracion PostgreSQL transaccional fue revertida. `verify` se corrio despues contra una base aislada temporal de PostgreSQL de Compose, vacia; esa base temporal fue eliminada tras las pruebas.
 
-**Identidad del empleado por documento:**
-- Identidad de API y dominio = (documentType: CC|CE|PA, documentNumber). El UUID queda como PK tecnica interna, nunca expuesta.
-- Inmutables tras creacion: tipo, numero de documento y hireDate (PUT con hireDate distinta -> 400). PUT actualiza firstName, lastName, email, position.
-- Validacion: CC/CE solo digitos 3-20; PA alfanumerico 5-20; tipo case-insensitive normalizado. UNIQUE(document_type, document_number) y email unico -> 409 por duplicado.
-- work_shifts referencia la clave natural (FK compuesta a employees(document_type, document_number), ON DELETE CASCADE); se elimina la columna employee_id UUID.
-- Trade-offs aceptados (documentar en README): CE->CC exige alta nueva; documento en URLs/access logs; PUT no corrige digitacion del documento.
+## Verificacion actual
+- `mvnw.cmd -f employees-api/pom.xml clean verify` con `TEST_DB_DEV_SERVICES=false` y PostgreSQL de Compose en una base aislada: **BUILD SUCCESS**, 59 unitarias + 2 IT, cero fallos.
+- JaCoCo unitario: **95.36% (864/906 lineas)**. Por capa: domain 92.15%, application 97.74%, infrastructure 96.77%. Branch: domain 71.43%, application 84.38%, infrastructure 77.78%. El check del build aplica el umbral de 80% de lineas al bundle.
+- `EmployeeResourceIT` verifica alta, consulta, listado y borrado por documento, crea/consulta una jornada y confirma 404 de la jornada tras borrar al empleado (cascada). El segundo IT verifica bulk, resumen semanal y rechazo 409 atomico (sin persistencia parcial) ante solape.
+- Los IT no cubren todavia todos los once endpoints ni sus errores por HTTP. Las pruebas de recursos REST existentes son unitarias.
+- Dev Services sigue habilitado por defecto, pero no se valido debido a incompatibilidad del cliente Docker de Quarkus 3.8.5 con la API del daemon disponible.
+- `docker compose config --quiet` y `docker compose build app` pasaron. Se redesplegaron app y PostgreSQL con el volumen existente; la API apunta a `employees_api_v2`, Flyway está en V4, health HTTP 200, Swagger UI HTTP 200 y OpenAPI publica once operaciones.
+- La base activa tiene 3 empleados y 17 jornadas semilla. La base previa `employees_db` se eliminó tras validar el nuevo despliegue, por instrucción del usuario; el volumen que contiene `employees_api_v2` se conserva.
+- No se encontraron imports Jakarta/Quarkus/Jackson en domain/application en la revision manual.
 
-**Migraciones:** V3__employee_document_identifier.sql (document_type + backfill 'CC' + UNIQUE compuesta + rewire de la FK de work_shifts) y V4__colombian_work_shifts.sql (CHECK end_time <> start_time + semillas realistas <= 42 h: jornada partida L-V, nocturno 22:00-06:00, festivo). No tocar V1/V2.
-
-**Correcciones del usuario a sugerencias de la IA (filas para la tabla de la pregunta 6 del README):**
-1. IA sugirio UUID como identidad + endpoint de cruce por documento -> usuario decidio documento como identificador en toda la API.
-2. IA sugirio endpoint de resumen semanal -> usuario decidio ver la carga semanal en el GET de jornadas existente.
-3. IA sugirio hireDate actualizable -> usuario decidio inmutable tras creacion.
-4. Jornadas no aterrizadas a horarios de Colombia -> reestructuracion con reglas colombianas (peticion del usuario).
-
-**Orden de implementacion (7 incrementos, cada uno compila y pasa sus pruebas):**
-1. Dominio: calendario de festivos + DayType/ShiftType + desglose de horas.
-2. Dominio: cruce de medianoche + solape real + WeeklyWorkloadPolicy (42 h).
-3. Dominio + application de empleados: Document como identidad, hireDate inmutable.
-4. Persistencia: V3 + adaptadores con clave natural.
-5. REST de empleados: rutas por documento + DTOs + OpenAPI.
-6. Jornadas end-to-end: bulk + respuestas enriquecidas + weeklySummaries + V4; verify integral.
-7. Docs: README (contrato, ER, curl, decisiones, filas de IA) + AGENTS.md/memory.md + demo Docker.
-
-## Estado y Verificaciones
-- Wrapper probado: Maven 3.9.9, Java 21.
-- `mvnw.cmd -f employees-api/pom.xml verify` con PostgreSQL Compose: BUILD SUCCESS; 39 pruebas unitarias y 1 de integracion, sin fallos.
-- JaCoCo unitario: 96.82% (608/628 lineas); el proceso Failsafe no instrumenta los IT.
-- `EmployeeResourceIT` valida Flyway, Hibernate y CRUD real contra PostgreSQL 15.
-- La unica IT actual es `EmployeeResourceIT`: no cubre jornadas ni todos los codigos de error a traves de HTTP. Las pruebas unitarias de recursos usan casos de uso mockeados.
-- `docker compose config` valida; `docker compose up --build -d` construyo y arranco app/PostgreSQL. `/q/health`, `/q/openapi` y `/q/swagger-ui` respondieron HTTP 200.
-- OpenAPI publicado: 10 operaciones, 0 sin resumen, con respuestas HTTP y ejemplos en los esquemas de entrada.
-- La revision de imports no encontro dependencias Jakarta, Quarkus o Jackson en `domain`/`application`.
-- Dev Services queda habilitado por defecto. En este entorno su cliente Docker aislado de Quarkus 3.8.5 pide API 1.32 mientras Docker Desktop exige 1.40; se verifico el IT usando PostgreSQL externo con `TEST_DB_DEV_SERVICES=false`.
-
-## Pendientes
-1. Ejecutar los 7 incrementos de la reestructuracion (ver plan aprobado); al terminar, repetir `mvnw.cmd verify` integral y registrar los numeros nuevos (pruebas y JaCoCo) en README y memory.md.
-2. Actualizar README con el contrato de 11 endpoints, ejemplos curl (bulk y cruce de medianoche incluidos), diagramas, decisiones nuevas y las 4 filas de correcciones del usuario en la tabla de la pregunta 6.
-3. Reescribir `EmployeeResourceIT` para las rutas por documento y agregar pruebas HTTP de integracion para jornadas y errores de los once endpoints si se exige el alcance completo de pruebas de `AGENTS.md`.
-4. Dev Services permanece habilitado por defecto pero no fue validado en este entorno debido a la incompatibilidad Docker; la integracion registrada uso PostgreSQL Compose con `TEST_DB_DEV_SERVICES=false`.
-5. El contenedor `employees-api` y PostgreSQL quedaron ejecutandose para la demostracion; detenerlos con `docker compose down` desde `employees-api` cuando el usuario termine. No borrar el volumen. Tras la reestructuracion, revalidar la demo (`docker compose up --build`) con las migraciones V3/V4.
-6. El candidato debe revisar que las respuestas de IA reflejen fielmente su experiencia personal; el texto actual se limita deliberadamente a hechos observables de esta sesion.
-
+## Pendientes / cautelas
+1. Ejecutar el Frente 3 (3.1–3.4) según el plan aprobado de arriba; refrescar los numeros de `verify` y JaCoCo en este archivo y el README al cerrarlo.
+2. El arbol tiene una prueba unitaria mas (60) que el ultimo `verify` registrado (59); los numeros finales salen del verify del Frente 3.
+3. Si se importa otra copia de la base legada, confirmar manualmente el tipo real de los documentos alfanumericos y agregar sus mapeos explicitos antes de V3; no asumir que son pasaportes.
+4. Cobertura HTTP de los once endpoints y sus errores: IT pendientes, ronda posterior al Frente 3.
+5. Dev Services no tiene evidencia de ejecucion exitosa en este entorno.
+6. El usuario debe confirmar que las respuestas de uso de IA en README reflejan su experiencia personal; falta la fila (5) del Frente 3 en la tabla de la pregunta 6.
