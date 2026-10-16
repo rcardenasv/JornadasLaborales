@@ -54,13 +54,13 @@
 - `EmployeeResourceIT` verifica alta, consulta, listado y borrado por documento, crea/consulta una jornada con el contrato `HH:mm`/horas decimales y confirma 404 de la jornada tras borrar al empleado (cascada). El segundo IT verifica bulk, resumen semanal con `ordinaryLimitHours`/`overtimeHours` y rechazo 409 atomico (sin persistencia parcial) ante duplicados del bulk.
 - Los IT no cubren todavia todos los once endpoints ni sus errores por HTTP (ronda posterior). Las pruebas de recursos REST existentes son unitarias.
 - Dev Services sigue habilitado por defecto, pero no se valido debido a incompatibilidad del cliente Docker de Quarkus 3.8.5 con la API del daemon disponible.
-- Pendiente registrar en esta seccion el redespliegue Docker del Frente 3 (Flyway en V5, health/Swagger/OpenAPI 200, 18 jornadas semilla) cuando se ejecute la demo.
+- Docker: `docker compose up -d --build app` reconstruyo y desplego app + PostgreSQL con el volumen existente. Flyway aplico V5 al arrancar; health HTTP 200, OpenAPI HTTP 200 y Swagger UI redirige (302 -> UI). `GET /api/v1/employees/CC/10000001/work-shifts?from=2026-10-12&to=2026-10-18` devolvio la semana 2026-W42 con `scheduledHours 46.00`, `ordinaryLimitHours 42.00`, `overtimeHours 4.00`, `remainingOrdinaryHours 0.00`, duraciones decimales y `HH:mm` (el 2026-10-12 se clasifica FESTIVO por el calendario). Tras la demo se ejecuto `docker compose down` y se conservo el volumen.
 - La base activa `employees_api_v2` tiene 3 empleados y 18 jornadas semilla tras V5. El volumen PostgreSQL se conserva entre redespliegues.
 - No se encontraron imports Jakarta/Quarkus/Jackson en domain/application en la revision manual.
 
 ## Pendientes / cautelas
-1. Demo Docker del Frente 3: `docker compose up --build`, comprobar health/Swagger/OpenAPI y la semana 2026-W42 con 46 h → 4 h extra, luego `docker compose down` sin borrar el volumen; registrar el resultado.
-2. Si se importa otra copia de la base legada, confirmar manualmente el tipo real de los documentos alfanumericos y agregar sus mapeos explicitos antes de V3; no asumir que son pasaportes.
-3. Cobertura HTTP de los once endpoints y sus errores: IT pendientes, ronda posterior al Frente 3.
-4. Dev Services no tiene evidencia de ejecucion exitosa en este entorno.
-5. El usuario debe confirmar que las respuestas de uso de IA en README reflejan su experiencia personal (incluida la fila (5) del Frente 3).
+1. Si se importa otra copia de la base legada, confirmar manualmente el tipo real de los documentos alfanumericos y agregar sus mapeos explicitos antes de V3; no asumir que son pasaportes.
+2. Cobertura HTTP de los once endpoints y sus errores: IT pendientes, ronda posterior al Frente 3.
+3. Dev Services no tiene evidencia de ejecucion exitosa en este entorno.
+4. El usuario debe confirmar que las respuestas de uso de IA en README reflejan su experiencia personal (incluida la fila (5) del Frente 3).
+5. Revisar el checklist de AGENTS.md seccion 14: marcar Frente 3, V5, README y verify post-Frente 3 como completados.

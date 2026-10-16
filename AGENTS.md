@@ -22,13 +22,13 @@ Criterios que pesan en la evaluación:
 ### Estado implementado (auditado 2026-10-16)
 
 - **Frentes 1 y 2 de la reestructuración (plan 2026-10-15): implementados y verificados.** La API expone once endpoints: CRUD de empleados por documento, CRUD de jornadas, `bulk` y listado con `weeklySummaries`. Stack fijado: Java 21, Quarkus 3.8.5, Maven Wrapper 3.9.9 y `quarkus-resteasy-reactive-jackson`. No describas esta versión como la LTS más reciente ni cambies el stack sin revisar compatibilidad y ejecutar la suite.
-- Persistencia: migraciones V1–V4 aplicadas (identidad por documento con FK compuesta y cascada, `CHECK (end_time <> start_time)` y semillas: jornada partida L–V 40 h, nocturno 22:00–06:00 y festivo). La base activa `employees_api_v2` tiene 3 empleados y 17 jornadas semilla; Flyway está en V4.
-- Último `verify` registrado (post-Frentes 1–2): **BUILD SUCCESS con 59 unitarias + 2 IT** y JaCoCo **95,36 % (864/906 líneas)**; por capa: domain 92,15 %, application 97,74 %, infrastructure 96,77 %. El árbol actual tiene una prueba unitaria más (60); los números se refrescarán con el `verify` del Frente 3.
-- Los 2 IT están en `EmployeeResourceIT`: flujo completo de empleado por documento (alta, consulta, listado, borrado), creación/consulta de una jornada y 404 de la jornada tras borrar al empleado (cascada); el segundo IT cubre bulk, resumen semanal y rechazo 409 atómico ante solape. Aún no hay cobertura HTTP de todos los once endpoints ni de sus errores (pendiente heredado).
-- **Frente 3 (2026-10-16): NO implementado** aún (auditoría: el límite semanal es 42 h fijo, la ventana diurna/nocturna 06:00–21:00/21:00–06:00 está hardcodeada en `WorkShift`, no existe `DayNightPolicy` ni `overtimeHours`, las duraciones se serializan en segundos (p. ej. `28800`), sin `HH:mm`, el resumen usa `maxWeeklyHours`/`remainingHours`, el listado aún trae `totalDaytimeHours`/`totalNighttimeHours` y `documentType`/`documentNumber` por jornada, y no existe `V5__overtime_seed_data.sql`). Ver Frente 3 más abajo y sección 13.
+- Persistencia: migraciones V1–V5 aplicadas (identidad por documento con FK compuesta y cascada, `CHECK (end_time <> start_time)`, semillas y semilla de horas extra en V5). La base activa `employees_api_v2` tiene 3 empleados y 18 jornadas semilla; Flyway está en V5.
+- Último `verify` registrado (post-Frente 3, 2026-10-16): **BUILD SUCCESS con 69 unitarias + 2 IT** y JaCoCo **95,62 % (896/937 líneas)**; por capa: domain 93,09 %, application 97,75 %, infrastructure 96,75 %.
+- Los 2 IT están en `EmployeeResourceIT`: flujo completo de empleado por documento (alta, consulta, listado, borrado), creación/consulta de una jornada (contrato `HH:mm` y horas decimales) y 404 de la jornada tras borrar al empleado (cascada); el segundo IT cubre bulk, resumen semanal con `ordinaryLimitHours`/`overtimeHours` y rechazo 409 del bulk repetido. Aún no hay cobertura HTTP de todos los once endpoints ni de sus errores (pendiente heredado).
+- **Frente 3 (2026-10-16): implementado y verificado** en cuatro incrementos: `WeeklyWorkloadPolicy` con vigencias 48/47/46/44/42 h (límite de la semana ISO según su domingo) y tope de 12 h extra; `DayNightPolicy` con ventana diurna/nocturna por fecha (06:00–21:00 hasta 2025-12-24; 06:00–19:00 desde 2025-12-25); `WorkShift` ya no hardcodea la ventana; resumen semanal con `ordinaryLimitHours`/`overtimeHours`/`remainingOrdinaryHours` calculado en dominio (`ListEmployeeWorkShifts`); REST con horas decimales escala 2 `HALF_UP` (`WorkShiftMapper.toHours`), `HH:mm` vía `@JsonFormat`, sin `documentType`/`documentNumber` por jornada ni `totalDaytimeHours`/`totalNighttimeHours`; `V5__overtime_seed_data.sql` agrega el sábado 2026-10-17 06:00–12:00 para `CC/10000001` (2026-W42 = 46 h → 4 h extra). Los tests cubren las fechas frontera de 4.1 y el criterio de extra.
 - Dev Services está configurado por defecto, pero no se pudo validar en el entorno registrado por incompatibilidad de versión de API Docker. Los IT se ejecutaron con PostgreSQL de Compose mediante `TEST_DB_DEV_SERVICES=false`; no afirmes que Dev Services pasó.
-- Docker Compose construido y desplegado sobre `employees_api_v2`; `health`, OpenAPI y Swagger UI devolvieron HTTP 200 y Flyway aplicó V1–V4. Según `memory.md`, los contenedores pueden permanecer activos: deténlos con `docker compose down` al terminar la demostración, sin borrar el volumen.
-- Las seis respuestas de uso de IA están completas en `employees-api/README.md` sin placeholders, con las cuatro filas registradas de correcciones del usuario (identidad por documento, resumen semanal en el GET, `hireDate` inmutable, aterrizaje a Colombia). Falta la fila (5) del Frente 3.
+- Docker Compose construido y redesplegado sobre `employees_api_v2` (post-Frente 3): `health` y OpenAPI devolvieron HTTP 200, Swagger UI redirige a la UI y Flyway aplicó V5 al arrancar; `GET .../work-shifts?from=2026-10-12&to=2026-10-18` demostró la semana 2026-W42 con 46.00/42.00/4.00/0.00. Tras la demo se ejecutó `docker compose down` conservando el volumen.
+- Las seis respuestas de uso de IA están completas en `employees-api/README.md` sin placeholders, con cinco filas registradas de correcciones del usuario (identidad por documento, resumen semanal en el GET, `hireDate` inmutable, aterrizaje a Colombia, vigencias normativas/horas extra/horas decimales del Frente 3).
 
 ### Plan aprobado (2026-10-15): reestructuración — Frentes 1 y 2 completados
 
@@ -486,20 +486,20 @@ Instrucciones para el agente:
 5. Respeta el alcance: no agregues funcionalidades fuera del Desafío 1 (no autenticación, no front-end, no caché, no mensajería) salvo petición explícita.
 6. **Escribe las pruebas unitarias junto con cada pieza de código**, no al final; verifica la cobertura de JaCoCo en cada fase.
 
-**Estado de implementación y próximos pasos (actualizado 2026-10-16)**
+**Estado de implementación y próximos pasos (actualizado 2026-10-16, post-Frente 3)**
 
-Implementado y verificado (Frentes 1–2 del plan 2026-10-15, auditados hoy): estructura Clean Architecture, dominio con `Document`/`DocumentType` como identidad, `ColombianHolidayCalendar`, `WeeklyWorkloadPolicy` con tope **42 h fijo** (pendiente Frente 3), casos de uso por documento, adaptadores JPA/REST, once endpoints OpenAPI, errores `problem+json`, Flyway V1–V4, Docker Compose desplegado sobre `employees_api_v2` y `verify` en verde (59 unitarias + 2 IT, JaCoCo 95,36 %).
+Implementado y verificado (Frentes 1–2 y Frente 3): estructura Clean Architecture, dominio con `Document`/`DocumentType` como identidad, `ColombianHolidayCalendar`, `WeeklyWorkloadPolicy` con **vigencias + horas extra** y `DayNightPolicy` por fecha, casos de uso por documento, adaptadores JPA/REST, once endpoints OpenAPI, errores `problem+json`, REST en horas decimales/`HH:mm`, Flyway V1–V5, Docker Compose desplegado sobre `employees_api_v2` y `verify` en verde (69 unitarias + 2 IT, JaCoCo 95,62 %).
 
 Estado del trabajo pendiente:
 
-Incrementos 1–7 de la reestructuración (clasificación, intervalos/policy, empleados por documento, V3/FK natural, REST por documento, jornadas end-to-end con `bulk` y V4, docs/demo): **completados y verificados**; ver auditoría en el estado implementado de la sección 1. El detalle original se conserva como sustento del trabajo ya realizado.
+Incrementos 1–7 de la reestructuración y los cuatro incrementos del Frente 3 (3.1–3.4, detallados a continuación): **completados y verificados**; ver auditoría en el estado implementado de la sección 1. El detalle original se conserva como sustento del trabajo ya realizado.
 
-**Incrementos del Frente 3 (ajuste normativo y de respuesta, 2026-10-16)** — cada uno compila y pasa sus pruebas antes de continuar:
+**Incrementos del Frente 3 (ajuste normativo y de respuesta, 2026-10-16)** — cada uno compiló y pasó sus pruebas antes de continuar; hoy están cerrados:
 
-- **3.1 Dominio — vigencias**: `WeeklyWorkloadPolicy` (límite ordinario por vigencia, tope de 12 h extra, cálculo de `overtimeHours`) y `DayNightPolicy` (ventana por vigencia) con pruebas parametrizadas en las fechas frontera de 4.1 (2023-07-15, 2024-07-15, 2025-07-15, 2026-07-15 y 2025-12-24/25).
-- **3.2 Dominio/aplicación**: `WorkShift` usa `DayNightPolicy`; el resumen semanal calcula límite, extra y restante; `WeeklyHoursExceededException` y `BulkCreateWorkShifts` adoptan el nuevo criterio (+tests con Mockito).
-- **3.3 REST**: DTOs y mappers con horas decimales, `HH:mm`, sin totales diurno/nocturno ni documento por jornada y `weeklySummaries` renombrado; OpenAPI con ejemplos y descripciones de campo (+tests).
-- **3.4 Semillas y verificación**: semana con horas extra en `V5__overtime_seed_data.sql` (V4 ya aplicada en `employees_api_v2` — no editar), `mvnw.cmd verify` en verde, README (tabla de vigencias, fuentes, simplificaciones, curl con la respuesta nueva, fila (5) de la tabla de IA) y `memory.md` actualizados. Demo Docker reconstruida (`docker compose up --build`) y contenedores detenidos al final sin borrar el volumen.
+- **3.1 Dominio — vigencias** ✅: `WeeklyWorkloadPolicy` (límite ordinario por vigencia, tope de 12 h extra, cálculo de `overtimeHours`) y `DayNightPolicy` (ventana por vigencia) con pruebas en las fechas frontera de 4.1.
+- **3.2 Dominio/aplicación** ✅: `WorkShift` usa `DayNightPolicy`; el resumen semanal calcula límite, extra y restante en el caso de uso; `WeeklyHoursExceededException` y `BulkCreateWorkShifts` adoptan el criterio nuevo.
+- **3.3 REST** ✅: DTOs y mappers con horas decimales, `HH:mm`, sin totales diurno/nocturno ni documento por jornada y `weeklySummaries` renombrado; OpenAPI con ejemplos y descripciones de campo.
+- **3.4 Semillas y verificación** ✅: `V5__overtime_seed_data.sql` aplicada (`CC/10000001`, sábado 2026-10-17 06:00–12:00 → 2026-W42 con 46 h → 4 h extra), `mvnw.cmd verify` en verde (69 + 2), README y `memory.md` actualizados; demo Docker reconstruida, verificada con la API en vivo y detenido con `docker compose down` sin borrar el volumen.
 
 Pendiente heredado (ronda posterior al Frente 3, según confirmación del usuario): IT HTTP de los once endpoints y sus errores; los 2 IT existentes mitigan esto pero no lo cubren por completo. Dev Services queda habilitado pero sin validar en este entorno (usar PostgreSQL de Compose con `TEST_DB_DEV_SERVICES=false`).
 - Las respuestas de IA en el README están redactadas solo con evidencia de esta sesión; deben mantenerse sin placeholders.
@@ -523,16 +523,16 @@ Pendiente heredado (ronda posterior al Frente 3, según confirmación del usuari
 
 ## 14. Definición de terminado (checklist final)
 
-- [x] Existe evidencia de `verify` verde **post-reestructuración (Frentes 1–2)**: 59 unitarias + 2 IT; JaCoCo 95,36 % (864/906). **Pendiente: repetir `verify` tras el Frente 3 y registrar los números nuevos en README y `memory.md`.**
+- [x] Existe evidencia de `verify` verde **post-Frente 3**: 69 unitarias + 2 IT; JaCoCo 95,62 % (896/937) — domain 93,09 %, application 97,75 %, infrastructure 96,75 %.
 - [x] Cobertura unitaria registrada ≥ 80 % y JaCoCo está configurado para fallar bajo el umbral durante `verify`.
 - [x] Pruebas unitarias usan Mockito para aislar puertos y colaboradores.
 - [x] Docker Compose construyó y arrancó app/BD; URLs health, OpenAPI y Swagger respondieron HTTP 200 en la ejecución registrada.
 - [ ] IT de los once endpoints y de sus errores: pendiente (ronda posterior al Frente 3); hoy los 2 IT de `EmployeeResourceIT` cubren el flujo de empleados por documento, una jornada y bulk con 409, pero no la totalidad de endpoints/errores.
 - [x] **Reestructuración (plan 2026-10-15)**: clasificación colombiana, cruce de medianoche, control semanal, `bulk` y `weeklySummaries` implementados y en verde en `verify`.
-- [ ] **Frente 3 (2026-10-16)**: límite semanal y ventana nocturna por vigencia (probados en fechas frontera), horas extra con tope de 12 h, duraciones en horas decimales, respuesta de jornadas sin totales redundantes y README con tabla de vigencias, fuentes y aviso de que no es asesoría legal.
+- [x] **Frente 3 (2026-10-16)**: límite semanal y ventana nocturna por vigencia (`WeeklyWorkloadPolicy`, `DayNightPolicy`; probados en fechas frontera), horas extra con tope de 12 h, duraciones en horas decimales, respuesta de jornadas sin totales redundantes y README con tabla de vigencias, fuentes y aviso de que no es asesoría legal.
 - [x] Identidad por documento (CC/CE/PA) en toda la API; UUID técnico no expuesto; `hireDate` inmutable (PUT distinto → 400).
-- [x] Migraciones V3/V4 aplicadas con redespliegue (Flyway en V4 sobre `employees_api_v2`, 3 empleados y 17 jornadas); pendiente V5 (semilla de horas extra) para demostrar el tope desde el primer arranque.
-- [ ] README actualizado para el Frente 3: tabla de vigencias, fuentes, curl con horas decimales y `overtimeHours`, fila (5) de la tabla de IA y cobertura/`verify` del Frente 3. (La versión actual ya documenta el contrato de 11 endpoints, ER con clave natural, ejemplos curl y las primeras filas de IA).
+- [x] Migraciones V1–V5 aplicadas (Flyway en V5 sobre `employees_api_v2`, 3 empleados y 18 jornadas; V5 semilla de horas extra, 46 h → 4 h extra demostrables vía API).
+- [x] README actualizado para el Frente 3: tabla de vigencias, fuentes, curl con horas decimales y `overtimeHours`, fila (5) de la tabla de IA y cobertura/`verify` del Frente 3. (La versión actual ya documenta el contrato de 11 endpoints, ER con clave natural, ejemplos curl y las primeras filas de IA).
 - [x] Las diez operaciones del contrato pre-reestructuración están documentadas en Swagger/OpenAPI, con ejemplos en los esquemas de entrada. Tras la reestructuración: once.
 - [x] El README incluye ejemplos curl para las operaciones de empleados y jornadas.
 - [x] Errores HTTP se documentan/representan con `application/problem+json`.
