@@ -100,6 +100,7 @@ class WorkShiftResourceTest {
 
         assertEquals(1, response.shifts().size());
         assertEquals(new BigDecimal("8.00"), response.totalWorkedHours());
+        assertEquals("2026-W40", response.weeklySummaries().get(0).week());
         assertEquals(new BigDecimal("8.00"),
             response.weeklySummaries().get(0).scheduledHours());
         assertEquals(new BigDecimal("42.00"),

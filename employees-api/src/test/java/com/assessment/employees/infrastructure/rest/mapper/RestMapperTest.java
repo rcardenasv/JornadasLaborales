@@ -52,7 +52,7 @@ class RestMapperTest {
         assertEquals(documentNumber, WorkShiftMapper.toCommand(documentType, documentNumber, create).documentNumber());
         assertEquals(id, WorkShiftMapper.toCommand(id, documentType, documentNumber, update).id());
         assertEquals(id, WorkShiftMapper.toResponse(result).id());
-        assertEquals(ShiftType.DIURNA, WorkShiftMapper.toResponse(result).shiftType());
+        assertEquals(ShiftType.DIURNA.name(), WorkShiftMapper.toResponse(result).shiftType());
         assertEquals(new BigDecimal("8.00"), WorkShiftMapper.toResponse(result).workedHours());
         assertEquals(new BigDecimal("0.00"), WorkShiftMapper.toResponse(result).nighttimeHours());
         assertEquals(new BigDecimal("7.50"), WorkShiftMapper.toHours(Duration.ofMinutes(450)));

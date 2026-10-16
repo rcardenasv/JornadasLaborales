@@ -1,17 +1,24 @@
 package com.assessment.employees.infrastructure.rest.mapper;
 
-import com.assessment.employees.application.dto.CreateWorkShiftCommand;
 import com.assessment.employees.application.dto.BulkCreateWorkShiftsCommand;
+import com.assessment.employees.application.dto.CreateWorkShiftCommand;
 import com.assessment.employees.application.dto.UpdateWorkShiftCommand;
+import com.assessment.employees.application.dto.WeeklyWorkloadSummaryResult;
+import com.assessment.employees.application.dto.WorkShiftListResult;
 import com.assessment.employees.application.dto.WorkShiftResult;
-import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
+import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
+import com.assessment.employees.infrastructure.rest.dto.WeeklySummaryResponse;
+import com.assessment.employees.infrastructure.rest.dto.WorkShiftListResponse;
 import com.assessment.employees.infrastructure.rest.dto.WorkShiftResponse;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.WeekFields;
 import java.util.UUID;
 
 /**
@@ -29,7 +36,7 @@ public final class WorkShiftMapper {
         return BigDecimal.valueOf(duration.toMinutes())
             .divide(BigDecimal.valueOf(60), HOURS_SCALE, RoundingMode.HALF_UP);
     }
-    
+
     public static CreateWorkShiftCommand toCommand(String documentType, String documentNumber,
                                                     CreateWorkShiftRequest request) {
         return new CreateWorkShiftCommand(
@@ -53,7 +60,7 @@ public final class WorkShiftMapper {
             request.endTime()
         );
     }
-    
+
     public static UpdateWorkShiftCommand toCommand(UUID shiftId, String documentType,
                                                    String documentNumber,
                                                    UpdateWorkShiftRequest request) {
@@ -66,18 +73,55 @@ public final class WorkShiftMapper {
             request.endTime()
         );
     }
-    
+
     public static WorkShiftResponse toResponse(WorkShiftResult result) {
         return new WorkShiftResponse(
             result.id(),
             result.date(),
             result.startTime(),
             result.endTime(),
-            result.dayType(),
-            result.shiftType(),
+            result.dayType().name(),
+            result.shiftType().name(),
             toHours(result.workedHours()),
             toHours(result.daytimeHours()),
             toHours(result.nighttimeHours())
         );
+    }
+
+    public static WorkShiftListResponse toListResponse(WorkShiftListResult result) {
+        return new WorkShiftListResponse(
+            result.shifts().stream().map(WorkShiftMapper::toResponse).toList(),
+            toHours(result.totalWorkedHours()),
+            result.weeklySummaries().stream()
+                .map(WorkShiftMapper::toSummaryResponse)
+                .toList()
+        );
+    }
+
+    public static WeeklySummaryResponse toSummaryResponse(WeeklyWorkloadSummaryResult summary) {
+        LocalDate weekStart = summary.weekStart();
+        WeekFields iso = WeekFields.ISO;
+        return new WeeklySummaryResponse(
+            "%d-W%02d".formatted(weekStart.get(iso.weekBasedYear()),
+                weekStart.get(iso.weekOfWeekBasedYear())),
+            weekStart,
+            weekStart.plusDays(6),
+            toHours(summary.scheduledHours()),
+            toHours(summary.ordinaryLimitHours()),
+            toHours(summary.overtimeHours()),
+            toHours(summary.remainingOrdinaryHours())
+        );
+    }
+
+    public static LocalDate parseIsoDate(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(
+                "Las fechas deben usar el formato ISO yyyy-MM-dd.", exception);
+        }
     }
 }

@@ -1,22 +1,16 @@
 package com.assessment.employees.infrastructure.rest.resource;
 
-import com.assessment.employees.application.dto.UpdateWorkShiftCommand;
-import com.assessment.employees.application.dto.WorkShiftListResult;
-import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.application.dto.BulkCreateWorkShiftsResult;
-import com.assessment.employees.application.dto.WeeklyWorkloadSummaryResult;
+import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.application.usecase.BulkCreateWorkShifts;
 import com.assessment.employees.application.usecase.CreateWorkShift;
 import com.assessment.employees.application.usecase.DeleteWorkShift;
 import com.assessment.employees.application.usecase.GetWorkShift;
 import com.assessment.employees.application.usecase.ListEmployeeWorkShifts;
 import com.assessment.employees.application.usecase.UpdateWorkShift;
-import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsResponse;
-import com.assessment.employees.infrastructure.rest.dto.WeeklySummaryResponse;
-import com.assessment.employees.infrastructure.rest.dto.WorkShiftListResponse;
-import com.assessment.employees.infrastructure.rest.dto.WorkShiftResponse;
+import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.mapper.WorkShiftMapper;
 import jakarta.inject.Inject;
@@ -38,10 +32,6 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.WeekFields;
 import java.util.List;
 
 @Path("/api/v1/employees/{documentType}/{documentNumber}/work-shifts")
@@ -50,6 +40,7 @@ import java.util.List;
 public class WorkShiftResource {
     /** Subruta del endpoint de carga agrupada. */
     private static final String BULK_PATH = "/bulk";
+
     private final CreateWorkShift createWorkShift;
     private final BulkCreateWorkShifts bulkCreateWorkShifts;
     private final GetWorkShift getWorkShift;
@@ -109,12 +100,14 @@ public class WorkShiftResource {
         BulkCreateWorkShiftsResult result = bulkCreateWorkShifts.execute(
             WorkShiftMapper.toCommand(documentType, documentNumber, request)
         );
+        List<WorkShiftResult> createdShifts = result.createdShifts();
         BulkCreateWorkShiftsResponse response = new BulkCreateWorkShiftsResponse(
-            result.createdShifts().stream().map(WorkShiftMapper::toResponse).toList(),
-            result.createdShifts().size(),
+            createdShifts.stream().map(WorkShiftMapper::toResponse).toList(),
+            createdShifts.size(),
             WorkShiftMapper.toHours(result.scheduledHours())
         );
-        String listPath = uriInfo.getPath().substring(0, uriInfo.getPath().lastIndexOf(BULK_PATH));
+        String listPath = uriInfo.getPath()
+            .substring(0, uriInfo.getPath().lastIndexOf(BULK_PATH));
         return Response.created(uriInfo.getAbsolutePathBuilder()
                 .replacePath(listPath)
                 .queryParam("from", request.from())
@@ -137,35 +130,10 @@ public class WorkShiftResource {
                          @QueryParam("from") String from,
                          @Parameter(description = "Fecha final inclusiva (yyyy-MM-dd)")
                          @QueryParam("to") String to) {
-        LocalDate fromDate = parseDate(from);
-        LocalDate toDate = parseDate(to);
-        WorkShiftListResult listResult = listWorkShifts.execute(
-            documentType, documentNumber, fromDate, toDate
-        );
-        List<WorkShiftResult> results = listResult.shifts();
-        List<WorkShiftResponse> responses = results.stream()
-            .map(WorkShiftMapper::toResponse)
-            .toList();
-        Duration totalHours = sum(results, WorkShiftResult::workedHours);
-        return Response.ok(new WorkShiftListResponse(
-            responses, WorkShiftMapper.toHours(totalHours),
-            listResult.weeklySummaries().stream().map(WorkShiftResource::toSummaryResponse).toList()
-        )).build();
-    }
-
-    private static WeeklySummaryResponse toSummaryResponse(WeeklyWorkloadSummaryResult summary) {
-        LocalDate weekStart = summary.weekStart();
-        WeekFields iso = WeekFields.ISO;
-        return new WeeklySummaryResponse(
-            "%d-W%02d".formatted(weekStart.get(iso.weekBasedYear()),
-                weekStart.get(iso.weekOfWeekBasedYear())),
-            weekStart,
-            weekStart.plusDays(6),
-            WorkShiftMapper.toHours(summary.scheduledHours()),
-            WorkShiftMapper.toHours(summary.ordinaryLimitHours()),
-            WorkShiftMapper.toHours(summary.overtimeHours()),
-            WorkShiftMapper.toHours(summary.remainingOrdinaryHours())
-        );
+        return Response.ok(WorkShiftMapper.toListResponse(listWorkShifts.execute(
+            documentType, documentNumber,
+            WorkShiftMapper.parseIsoDate(from), WorkShiftMapper.parseIsoDate(to)
+        ))).build();
     }
 
     @GET
@@ -196,10 +164,9 @@ public class WorkShiftResource {
                            @PathParam("documentNumber") String documentNumber,
                            @PathParam("shiftId") String shiftId,
                            @Valid UpdateWorkShiftRequest request) {
-        UpdateWorkShiftCommand command = WorkShiftMapper.toCommand(
+        WorkShiftResult result = updateWorkShift.execute(WorkShiftMapper.toCommand(
             java.util.UUID.fromString(shiftId), documentType, documentNumber, request
-        );
-        WorkShiftResult result = updateWorkShift.execute(command);
+        ));
         return Response.ok(WorkShiftMapper.toResponse(result)).build();
     }
 
@@ -217,21 +184,4 @@ public class WorkShiftResource {
         deleteWorkShift.execute(shiftId, documentType, documentNumber);
         return Response.noContent().build();
     }
-
-    private LocalDate parseDate(String value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(value);
-        } catch (DateTimeParseException exception) {
-            throw new IllegalArgumentException("Las fechas deben usar el formato ISO yyyy-MM-dd.", exception);
-        }
-    }
-
-    private Duration sum(List<WorkShiftResult> results,
-                         java.util.function.Function<WorkShiftResult, Duration> value) {
-        return results.stream().map(value).reduce(Duration.ZERO, Duration::plus);
-    }
-
 }

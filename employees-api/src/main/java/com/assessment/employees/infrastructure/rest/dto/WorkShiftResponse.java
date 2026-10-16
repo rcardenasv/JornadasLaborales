@@ -5,8 +5,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
-import com.assessment.employees.domain.model.DayType;
-import com.assessment.employees.domain.model.ShiftType;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 /**
@@ -26,9 +24,9 @@ public record WorkShiftResponse(
     @JsonFormat(pattern = "HH:mm")
     LocalTime endTime,
     @Schema(description = "Tipo de día calculado: ORDINARIO, DOMINICAL o FESTIVO.", example = "ORDINARIO")
-    DayType dayType,
+    String dayType,
     @Schema(description = "Tipo de turno calculado: DIURNA, NOCTURNA o MIXTA.", example = "DIURNA")
-    ShiftType shiftType,
+    String shiftType,
     @Schema(description = "Horas trabajadas totales (decimales).", example = "8.00")
     BigDecimal workedHours,
     @Schema(description = "Horas dentro de la ventana diurna vigente (decimales).", example = "8.00")
