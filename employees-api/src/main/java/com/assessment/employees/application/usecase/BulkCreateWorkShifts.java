@@ -16,7 +16,6 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -90,8 +89,8 @@ public class BulkCreateWorkShifts {
     }
 
     private List<WorkShift> findRelevantShifts(Document document, LocalDate from, LocalDate to) {
-        LocalDate firstWeek = weekStart(from);
-        LocalDate lastWeek = weekStart(to);
+        LocalDate firstWeek = WorkShift.weekStartOf(from);
+        LocalDate lastWeek = WorkShift.weekStartOf(to);
         return workShiftRepository.findByEmployeeDocumentAndDateRange(
             document, firstWeek.minusDays(1), lastWeek.plusWeeks(1).plusDays(6)
         );
@@ -126,9 +125,5 @@ public class BulkCreateWorkShifts {
                 .forEach(conflicts::add);
         });
         return conflicts;
-    }
-
-    private LocalDate weekStart(LocalDate date) {
-        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 }

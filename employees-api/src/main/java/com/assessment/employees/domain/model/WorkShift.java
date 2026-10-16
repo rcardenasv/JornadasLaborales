@@ -1,6 +1,7 @@
 package com.assessment.employees.domain.model;
 
 import com.assessment.employees.domain.exception.InvalidWorkShiftException;
+import com.assessment.employees.domain.exception.WorkShiftOverlapException;
 
 import java.time.Duration;
 import java.time.DayOfWeek;
@@ -8,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -92,7 +94,7 @@ public class WorkShift {
     }
 
     public LocalDate getWeekStartDate() {
-        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        return weekStartOf(date);
     }
 
     private Duration calculateWorkedHours() {
@@ -134,6 +136,22 @@ public class WorkShift {
     /** Devuelve una nueva jornada con la misma identidad pero nueva fecha y horario. */
     public WorkShift with(LocalDate date, LocalTime startTime, LocalTime endTime) {
         return new WorkShift(id, employeeDocument, date, startTime, endTime);
+    }
+
+    /** Lunes de la semana que toca la fecha dada (corte ISO: lunes 00:00). */
+    public static LocalDate weekStartOf(LocalDate date) {
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    }
+
+    /** Rechaza `candidate` si se solapa con alguna jornada de `existing` (409 en REST). */
+    public static void rejectOverlap(List<WorkShift> existing, WorkShift candidate) {
+        existing.stream()
+            .filter(candidate::overlaps)
+            .findFirst()
+            .ifPresent(shift -> {
+                throw new WorkShiftOverlapException(candidate.getDate(), candidate.getStartTime(),
+                    candidate.getEndTime());
+            });
     }
 
     private static LocalDateTime max(LocalDateTime a, LocalDateTime b) {

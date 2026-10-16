@@ -3,7 +3,6 @@ package com.assessment.employees.application.usecase;
 import com.assessment.employees.application.dto.CreateWorkShiftCommand;
 import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
-import com.assessment.employees.domain.exception.WorkShiftOverlapException;
 import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WorkShift;
 import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
@@ -33,8 +32,8 @@ public class CreateWorkShift {
             document, command.date(), command.startTime(), command.endTime()
         );
         List<WorkShift> existing = findRelevantShifts(document, candidate);
-        rejectOverlap(existing, candidate);
-        validateWeeklyWorkload(existing, List.of(candidate));
+        WorkShift.rejectOverlap(existing, candidate);
+        WeeklyWorkloadPolicy.validateAdditions(existing, List.of(candidate));
         return WorkShiftResult.fromDomain(workShiftRepository.save(candidate));
     }
 
@@ -43,17 +42,5 @@ public class CreateWorkShift {
         return workShiftRepository.findByEmployeeDocumentAndDateRange(
             document, weekStart.minusDays(1), weekStart.plusWeeks(2)
         );
-    }
-
-    void rejectOverlap(List<WorkShift> existing, WorkShift candidate) {
-        if (existing.stream().anyMatch(candidate::overlaps)) {
-            throw new WorkShiftOverlapException(
-                candidate.getDate(), candidate.getStartTime(), candidate.getEndTime()
-            );
-        }
-    }
-
-    void validateWeeklyWorkload(List<WorkShift> existing, List<WorkShift> additions) {
-        WeeklyWorkloadPolicy.validateAdditions(existing, additions);
     }
 }

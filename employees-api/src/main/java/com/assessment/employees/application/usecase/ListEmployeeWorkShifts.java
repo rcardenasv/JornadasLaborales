@@ -41,7 +41,7 @@ public class ListEmployeeWorkShifts {
             throw new InvalidDateRangeException("La fecha desde no puede ser posterior a la fecha hasta.");
         }
 
-        LocalDate queryFrom = from == null ? null : weekStart(from).minusDays(1);
+        LocalDate queryFrom = from == null ? null : WorkShift.weekStartOf(from).minusDays(1);
         LocalDate queryTo = to == null ? null : weekEnd(to);
         List<WorkShift> shifts = from == null && to == null
             ? workShiftRepository.findByEmployeeDocument(document)
@@ -55,8 +55,8 @@ public class ListEmployeeWorkShifts {
         List<WeeklyWorkloadSummaryResult> weeklySummaries = WeeklyWorkloadPolicy.weeklyHours(shifts)
             .entrySet()
             .stream()
-            .filter(entry -> from == null || !entry.getKey().isBefore(weekStart(from)))
-            .filter(entry -> to == null || !entry.getKey().isAfter(weekStart(to)))
+            .filter(entry -> from == null || !entry.getKey().isBefore(WorkShift.weekStartOf(from)))
+            .filter(entry -> to == null || !entry.getKey().isAfter(WorkShift.weekStartOf(to)))
             .map(entry -> toSummary(entry.getKey(), entry.getValue()))
             .toList();
         return new WorkShiftListResult(results, weeklySummaries);
@@ -70,10 +70,6 @@ public class ListEmployeeWorkShifts {
             WeeklyWorkloadPolicy.overtimeHours(scheduledHours, weekStart),
             WeeklyWorkloadPolicy.remainingOrdinaryHours(scheduledHours, weekStart)
         );
-    }
-
-    private LocalDate weekStart(LocalDate date) {
-        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     private LocalDate weekEnd(LocalDate date) {

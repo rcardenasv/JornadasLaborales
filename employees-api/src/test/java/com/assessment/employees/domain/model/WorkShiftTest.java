@@ -1,10 +1,13 @@
 package com.assessment.employees.domain.model;
 
 import com.assessment.employees.domain.exception.InvalidWorkShiftException;
+import com.assessment.employees.domain.exception.WorkShiftOverlapException;
 import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -174,5 +177,20 @@ class WorkShiftTest {
 
         assertTrue(overnight.overlaps(overlapping));
         assertFalse(overnight.overlaps(adjacent));
+    }
+
+    @Test
+    void rejectOverlapThrowsOnlyWhenCandidateConflicts() {
+        Document employeeId = Document.of("CC", "123456");
+        WorkShift overnight = WorkShift.create(employeeId,
+            LocalDate.of(2026, 10, 16), LocalTime.of(22, 0), LocalTime.of(6, 0));
+        WorkShift overlapping = WorkShift.create(employeeId,
+            LocalDate.of(2026, 10, 17), LocalTime.of(5, 0), LocalTime.of(7, 0));
+        WorkShift adjacent = WorkShift.create(employeeId,
+            LocalDate.of(2026, 10, 17), LocalTime.of(6, 0), LocalTime.of(8, 0));
+
+        assertThrows(WorkShiftOverlapException.class,
+            () -> WorkShift.rejectOverlap(List.of(overnight), overlapping));
+        assertDoesNotThrow(() -> WorkShift.rejectOverlap(List.of(overnight), adjacent));
     }
 }

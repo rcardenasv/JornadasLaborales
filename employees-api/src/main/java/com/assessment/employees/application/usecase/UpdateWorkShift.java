@@ -4,7 +4,6 @@ import com.assessment.employees.application.dto.UpdateWorkShiftCommand;
 import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.exception.WorkShiftNotFoundException;
-import com.assessment.employees.domain.exception.WorkShiftOverlapException;
 import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WorkShift;
 import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
@@ -38,8 +37,8 @@ public class UpdateWorkShift {
         List<WorkShift> otherShifts = findRelevantShifts(document, updated).stream()
             .filter(shift -> !shift.getId().equals(id))
             .toList();
-        rejectOverlap(otherShifts, updated);
-        validateWeeklyWorkload(otherShifts, updated);
+        WorkShift.rejectOverlap(otherShifts, updated);
+        WeeklyWorkloadPolicy.validateAdditions(otherShifts, List.of(updated));
         return WorkShiftResult.fromDomain(workShiftRepository.save(updated));
     }
 
@@ -47,17 +46,5 @@ public class UpdateWorkShift {
         return workShiftRepository.findByEmployeeDocumentAndDateRange(
             document, shift.getWeekStartDate().minusDays(1), shift.getWeekStartDate().plusWeeks(2)
         );
-    }
-
-    private void rejectOverlap(List<WorkShift> shifts, WorkShift candidate) {
-        if (shifts.stream().anyMatch(candidate::overlaps)) {
-            throw new WorkShiftOverlapException(
-                candidate.getDate(), candidate.getStartTime(), candidate.getEndTime()
-            );
-        }
-    }
-
-    private void validateWeeklyWorkload(List<WorkShift> shifts, WorkShift candidate) {
-        WeeklyWorkloadPolicy.validateAdditions(shifts, List.of(candidate));
     }
 }
