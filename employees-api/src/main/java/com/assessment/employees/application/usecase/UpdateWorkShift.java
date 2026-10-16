@@ -34,16 +34,13 @@ public class UpdateWorkShift {
             throw new EmployeeNotFoundException(document);
         }
 
-        WorkShift updated = WorkShift.create(
-            document, command.date(), command.startTime(), command.endTime()
-        );
+        WorkShift updated = existing.with(command.date(), command.startTime(), command.endTime());
         List<WorkShift> otherShifts = findRelevantShifts(document, updated).stream()
             .filter(shift -> !shift.getId().equals(id))
             .toList();
         rejectOverlap(otherShifts, updated);
         validateWeeklyWorkload(otherShifts, updated);
-        existing.update(command.date(), command.startTime(), command.endTime());
-        return WorkShiftResult.fromDomain(workShiftRepository.save(existing));
+        return WorkShiftResult.fromDomain(workShiftRepository.save(updated));
     }
 
     private List<WorkShift> findRelevantShifts(Document document, WorkShift shift) {

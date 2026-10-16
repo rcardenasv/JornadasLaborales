@@ -10,25 +10,31 @@ import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.UUID;
 
+/**
+ * Jornada laboral inmutable: toda modificación produce una nueva instancia
+ * mediante {@link #with}. La clasificación (desglose diurno/nocturno, tipo de
+ * día y tipo de turno) se calcula en el constructor según las reglas
+ * colombianas vigentes para la fecha de inicio.
+ */
 public class WorkShift {
-    private UUID id;
-    private Document employeeDocument;
-    private Date date;
-    private Time startTime;
-    private Time endTime;
-    private Duration workedHours;
-    private Duration daytimeHours;
-    private Duration nighttimeHours;
-    private DayType dayType;
-    private ShiftType shiftType;
+    private final UUID id;
+    private final Document employeeDocument;
+    private final LocalDate date;
+    private final LocalTime startTime;
+    private final LocalTime endTime;
+    private final Duration workedHours;
+    private final Duration daytimeHours;
+    private final Duration nighttimeHours;
+    private final DayType dayType;
+    private final ShiftType shiftType;
 
     public WorkShift(UUID id, Document employeeDocument, LocalDate date,
                      LocalTime startTime, LocalTime endTime) {
         this.id = id;
         this.employeeDocument = employeeDocument;
-        this.date = new Date(date);
-        this.startTime = new Time(startTime);
-        this.endTime = new Time(endTime);
+        this.date = date;
+        this.startTime = startTime;
+        this.endTime = endTime;
         validate();
         this.workedHours = calculateWorkedHours();
         this.daytimeHours = calculateDaytimeHours();
@@ -37,46 +43,10 @@ public class WorkShift {
         this.shiftType = calculateShiftType();
     }
 
-    private LocalDateTime getStartDateTime() {
-        return date.value().atTime(startTime.value());
-    }
-
-    private LocalDateTime getEndDateTime() {
-        LocalDate endDate = endTime.value().isBefore(startTime.value())
-            ? date.value().plusDays(1)
-            : date.value();
-        return endDate.atTime(endTime.value());
-    }
-
-    public Duration getWorkedHoursWithin(LocalDateTime startInclusive,
-                                         LocalDateTime endExclusive) {
-        LocalDateTime overlapStart = getStartDateTime().isAfter(startInclusive)
-            ? getStartDateTime()
-            : startInclusive;
-        LocalDateTime overlapEnd = getEndDateTime().isBefore(endExclusive)
-            ? getEndDateTime()
-            : endExclusive;
-        return overlapStart.isBefore(overlapEnd)
-            ? Duration.between(overlapStart, overlapEnd)
-            : Duration.ZERO;
-    }
-
-    public boolean overlaps(WorkShift other) {
-        return getStartDateTime().isBefore(other.getEndDateTime())
-            && other.getStartDateTime().isBefore(getEndDateTime());
-    }
-
-    public LocalDate getEndDate() {
-        return endTime.value().isBefore(startTime.value())
-            ? date.value().plusDays(1)
-            : date.value();
-    }
-
-    public LocalDate getWeekStartDate() {
-        return date.value().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-    }
-
     private void validate() {
+        if (id == null) {
+            throw new InvalidWorkShiftException("El identificador de la jornada es obligatorio.");
+        }
         if (employeeDocument == null) {
             throw new InvalidWorkShiftException("El empleado de la jornada es obligatorio.");
         }
@@ -89,9 +59,40 @@ public class WorkShift {
         if (endTime == null) {
             throw new InvalidWorkShiftException("La hora de fin de la jornada es obligatoria.");
         }
-        if (endTime.value().equals(startTime.value())) {
+        if (endTime.equals(startTime)) {
             throw new InvalidWorkShiftException("La hora de fin debe ser distinta de la hora de inicio.");
         }
+    }
+
+    private LocalDateTime getStartDateTime() {
+        return date.atTime(startTime);
+    }
+
+    private LocalDateTime getEndDateTime() {
+        LocalDate endDate = endTime.isBefore(startTime) ? date.plusDays(1) : date;
+        return endDate.atTime(endTime);
+    }
+
+    public Duration getWorkedHoursWithin(LocalDateTime startInclusive,
+                                         LocalDateTime endExclusive) {
+        LocalDateTime overlapStart = max(getStartDateTime(), startInclusive);
+        LocalDateTime overlapEnd = min(getEndDateTime(), endExclusive);
+        return overlapStart.isBefore(overlapEnd)
+            ? Duration.between(overlapStart, overlapEnd)
+            : Duration.ZERO;
+    }
+
+    public boolean overlaps(WorkShift other) {
+        return getStartDateTime().isBefore(other.getEndDateTime())
+            && other.getStartDateTime().isBefore(getEndDateTime());
+    }
+
+    public LocalDate getEndDate() {
+        return endTime.isBefore(startTime) ? date.plusDays(1) : date;
+    }
+
+    public LocalDate getWeekStartDate() {
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     private Duration calculateWorkedHours() {
@@ -99,27 +100,23 @@ public class WorkShift {
     }
 
     private Duration calculateDaytimeHours() {
-        LocalTime daytimeStart = DayNightPolicy.daytimeStart(date.value());
-        LocalTime daytimeEnd = DayNightPolicy.daytimeEnd(date.value());
+        LocalTime daytimeStart = DayNightPolicy.daytimeStart(date);
+        LocalTime daytimeEnd = DayNightPolicy.daytimeEnd(date);
         Duration daytime = Duration.ZERO;
-        for (LocalDate currentDate = date.value();
+        for (LocalDate currentDate = date;
              !currentDate.isAfter(getEndDate());
              currentDate = currentDate.plusDays(1)) {
-            LocalDateTime daytimeStartDateTime = currentDate.atTime(daytimeStart);
-            LocalDateTime daytimeEndDateTime = currentDate.atTime(daytimeEnd);
-            daytime = daytime.plus(getWorkedHoursWithin(daytimeStartDateTime, daytimeEndDateTime));
+            daytime = daytime.plus(getWorkedHoursWithin(
+                currentDate.atTime(daytimeStart), currentDate.atTime(daytimeEnd)));
         }
         return daytime;
     }
 
     private DayType calculateDayType() {
-        LocalDate shiftDate = date.value();
-        if (ColombianHolidayCalendar.isHoliday(shiftDate)) {
+        if (ColombianHolidayCalendar.isHoliday(date)) {
             return DayType.FESTIVO;
         }
-        return shiftDate.getDayOfWeek() == DayOfWeek.SUNDAY
-            ? DayType.DOMINICAL
-            : DayType.ORDINARIO;
+        return date.getDayOfWeek() == DayOfWeek.SUNDAY ? DayType.DOMINICAL : DayType.ORDINARIO;
     }
 
     private ShiftType calculateShiftType() {
@@ -134,24 +131,25 @@ public class WorkShift {
         return new WorkShift(UUID.randomUUID(), employeeDocument, date, startTime, endTime);
     }
 
-    public void update(LocalDate date, LocalTime startTime, LocalTime endTime) {
-        WorkShift updated = new WorkShift(id, employeeDocument, date, startTime, endTime);
-        this.date = updated.date;
-        this.startTime = updated.startTime;
-        this.endTime = updated.endTime;
-        this.workedHours = updated.workedHours;
-        this.daytimeHours = updated.daytimeHours;
-        this.nighttimeHours = updated.nighttimeHours;
-        this.dayType = updated.dayType;
-        this.shiftType = updated.shiftType;
+    /** Devuelve una nueva jornada con la misma identidad pero nueva fecha y horario. */
+    public WorkShift with(LocalDate date, LocalTime startTime, LocalTime endTime) {
+        return new WorkShift(id, employeeDocument, date, startTime, endTime);
+    }
+
+    private static LocalDateTime max(LocalDateTime a, LocalDateTime b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    private static LocalDateTime min(LocalDateTime a, LocalDateTime b) {
+        return a.isBefore(b) ? a : b;
     }
 
     // Getters
     public UUID getId() { return id; }
     public Document getEmployeeDocument() { return employeeDocument; }
-    public LocalDate getDate() { return date.value(); }
-    public LocalTime getStartTime() { return startTime.value(); }
-    public LocalTime getEndTime() { return endTime.value(); }
+    public LocalDate getDate() { return date; }
+    public LocalTime getStartTime() { return startTime; }
+    public LocalTime getEndTime() { return endTime; }
     public Duration getWorkedHours() { return workedHours; }
     public Duration getDaytimeHours() { return daytimeHours; }
     public Duration getNighttimeHours() { return nighttimeHours; }

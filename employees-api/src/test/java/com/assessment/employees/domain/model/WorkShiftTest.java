@@ -110,7 +110,7 @@ class WorkShiftTest {
     }
 
     @Test
-    void shouldRecalculateClassificationWhenUpdated() {
+    void shouldRecalculateClassificationOnWith() {
         WorkShift shift = WorkShift.create(
             Document.of("CC", "123456"),
             LocalDate.of(2026, 10, 16),
@@ -118,7 +118,7 @@ class WorkShiftTest {
             LocalTime.of(17, 0)
         );
 
-        shift.update(
+        shift = shift.with(
             LocalDate.of(2026, 1, 11),
             LocalTime.of(22, 0),
             LocalTime.of(23, 0)

@@ -336,7 +336,7 @@ class UseCasesTest {
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(employee()));
         when(shifts.findByEmployeeDocumentAndDateRange(eq(DOCUMENT), any(), any()))
             .thenReturn(List.of(current));
-        when(shifts.save(current)).thenReturn(current);
+        when(shifts.save(any(WorkShift.class))).thenAnswer(call -> call.getArgument(0));
         UpdateWorkShift useCase = new UpdateWorkShift(shifts, employees);
 
         assertEquals(LocalTime.of(10, 0), useCase.execute(command).startTime());
