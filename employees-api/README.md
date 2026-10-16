@@ -49,11 +49,24 @@ Prefijo: `/api/v1`. Los errores se responden como `application/problem+json`. Lo
 
 La identidad del empleado es `(documentType, documentNumber)`, donde el tipo es `CC`, `CE` o `PA`; el UUID de empleados es interno y no se devuelve en la API. Los números CC/CE admiten 3–20 dígitos y PA 5–20 caracteres alfanuméricos. El UUID de jornada sí es público y se utiliza como `{shiftId}`. El tipo de documento es case-insensitive y se normaliza a mayúsculas.
 
-Las jornadas se ordenan por fecha y hora de inicio. Cada elemento incluye `workedHours`, `daytimeHours`, `nighttimeHours`, `dayType` y `shiftType`; el listado agrega totales y `weeklySummaries` para las semanas ISO completas tocadas por el filtro. Una jornada que termina antes de su hora de inicio cruza a la mañana siguiente; horas iguales se rechazan. El tiempo diurno es 06:00–21:00 y el nocturno 21:00–06:00. Domingo y festivo colombiano se clasifican por el día de inicio. El calendario calcula festivos fijos, Semana Santa y traslados de Emiliani.
+Las jornadas se ordenan por fecha y hora de inicio. Cada elemento incluye `date`, `startTime` y `endTime` (formato `HH:mm`; un `endTime` menor que el inicio cruza a la mañana siguiente, horas iguales se rechazan), `dayType`, `shiftType` y las horas decimales `workedHours`, `daytimeHours` y `nighttimeHours` (sin pausas: una jornada continua 08:00–17:00 cuenta nueve horas). El desglose diurno/nocturno y el tipo de turno se calculan con la ventana vigente en la **fecha de inicio** de la jornada. Domingo y festivo colombiano se clasifican por el día de inicio. El calendario calcula festivos fijos, Semana Santa y traslados de Emiliani. El listado agrega `totalWorkedHours` (suma exacta de las jornadas listadas) y `weeklySummaries` para las semanas ISO completas tocadas por el filtro.
 
-Los campos de duración (`workedHours`, totales y carga semanal) se serializan como números de segundos; por ejemplo, ocho horas se devuelven como `28800`.
+El proyecto aplica los parámetros legales colombianos **por vigencia** (no constituye asesoría legal; las reglas se validaron solo como aproximación técnica de este ejercicio):
 
-La carga semanal no puede superar 42 horas ISO; las horas de una jornada dominical que termina el lunes se reparten entre las dos semanas. Los solapes y excesos devuelven `409`. El bulk acepta `from`, `to`, `weekdays` opcional y una franja horaria única; un rango mayor de 92 días, `weekdays` vacío o cero fechas generadas devuelve `400`. Si alguna fecha presenta solape o exceso semanal, devuelve `409` con las fechas conflictivas y no persiste ninguna jornada. Si se omite `weekdays`, se consideran todos los días.
+| Vigente desde | Límite ordinario semanal | Ventana diurna | Ventana nocturna |
+|---|---|---|---|
+| antes del 2023-07-15 | 48 h | — | — |
+| 2023-07-15 (Ley 2101 de 2021) | 47 h | 06:00–21:00 | 21:00–06:00 |
+| 2024-07-15 | 46 h | idem | idem |
+| 2025-07-15 | 44 h | idem | idem |
+| 2026-07-15 | **42 h** | idem | idem |
+| 2025-12-25 (Ley 2466 de 2025, art. 10) | — | **06:00–19:00** | **19:00–06:00** |
+
+Criterios de aplicación: el límite de una semana ISO es el vigente en su **domingo** (criterio conservador en semanas de transición) y la ventana diurna/nocturna de una jornada es la vigente en su **fecha de inicio**, incluso si cruza medianoche. Fuentes: Ley 2101 de 2021 (reducción gradual de la jornada máxima ordinaria), Ley 2466 de 2025 art. 10 (ventana nocturna) y art. 22 de la Ley 50 de 1990 modificado por la misma ley (horas extra). Fuera de alcance: tope diario de 2 h extra, regímenes especiales (vigilancia, Ley 1920 de 2018, salud), distribuciones flexibles de jornada, tiempo parcial y todo cálculo monetario.
+
+Las duraciones se reportan en **horas decimales con dos decimales** (`HALF_UP`); ocho horas se devuelven como `8.00` y 450 minutos como `7.50`.
+
+Por semana ISO: `scheduledHours` suma toda la semana (aunque el filtro la corte), `overtimeHours` es el exceso sobre el límite ordinario vigente y `remainingOrdinaryHours` las horas ordinarias restantes. El exceso programado **no se rechaza**: se informa como horas extra y solo devuelve `409` cuando las extra de la semana superan **12 horas** (`WeeklyHoursExceededException`). Las jornadas que terminan el lunes se reparten entre las dos semanas ISO. Los solapes, incluso cruzando medianoche, devuelven `409`. El bulk acepta `from`, `to`, `weekdays` opcional y una franja horaria única; un rango mayor de 92 días, `weekdays` vacío o cero fechas generadas devuelve `400`. Si alguna fecha presenta solape o exceso del tope de extra, devuelve `409` con las fechas conflictivas y no persiste ninguna jornada. Si se omite `weekdays`, se consideran todos los días. La semilla realista incluye la semana 2026-W42 del empleado `CC/10000001` con **46 h programadas → 4 h extra** (`V5__overtime_seed_data.sql`), visible desde el primer arranque.
 
 Los filtros `from`/`to` son opcionales e independientes; si ambos existen y `from` es posterior a `to`, la API devuelve `400`. En un empleado existente sin jornadas el GET devuelve `200` con listas vacías. Una jornada consultada bajo otro documento devuelve `404`.
 
@@ -115,7 +128,7 @@ Agregar a un empleado existente:
 ```bash
 curl -i -X POST "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER/work-shifts" \
   -H 'Content-Type: application/json' \
-  -d '{"date":"2026-10-17","startTime":"22:00:00","endTime":"06:00:00"}'
+  -d '{"date":"2026-10-17","startTime":"22:00","endTime":"06:00"}'
 ```
 
 Consultar el listado completo o filtrar por fechas:
@@ -128,7 +141,39 @@ curl "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER/work-shifts?from=2026-
 # para generar una jornada en cada fecha del rango.
 curl -i -X POST "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER/work-shifts/bulk" \
   -H 'Content-Type: application/json' \
-  -d '{"from":"2026-10-19","to":"2026-10-23","weekdays":["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY"],"startTime":"08:00:00","endTime":"12:00:00"}'
+  -d '{"from":"2026-10-19","to":"2026-10-23","weekdays":["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY"],"startTime":"08:00","endTime":"12:00"}'
+```
+
+Ejemplo de resumen semanal (semana 2026-W42 del empleado semilla `CC/10000001`, con 46 h programadas):
+
+```json
+{
+  "shifts": [
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440013",
+      "date": "2026-10-17",
+      "startTime": "06:00",
+      "endTime": "12:00",
+      "dayType": "ORDINARIO",
+      "shiftType": "DIURNA",
+      "workedHours": 6.00,
+      "daytimeHours": 6.00,
+      "nighttimeHours": 0.00
+    }
+  ],
+  "totalWorkedHours": 46.00,
+  "weeklySummaries": [
+    {
+      "week": "2026-W42",
+      "startDate": "2026-10-12",
+      "endDate": "2026-10-18",
+      "scheduledHours": 46.00,
+      "ordinaryLimitHours": 42.00,
+      "overtimeHours": 4.00,
+      "remainingOrdinaryHours": 0.00
+    }
+  ]
+}
 ```
 
 Consultar una jornada:
@@ -142,7 +187,7 @@ Actualizar:
 ```bash
 curl -i -X PUT "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER/work-shifts/$SHIFT_ID" \
   -H 'Content-Type: application/json' \
-  -d '{"date":"2026-10-15","startTime":"08:30:00","endTime":"16:30:00"}'
+  -d '{"date":"2026-10-15","startTime":"08:30","endTime":"16:30"}'
 ```
 
 Eliminar:
@@ -168,9 +213,9 @@ Ejecutar unitarias, integración y el control de cobertura:
 .\mvnw.cmd verify
 ```
 
-La ejecución integral posterior a la reestructuración terminó correctamente: `verify` ejecutó **59 pruebas unitarias y 2 IT**, todas sin fallos. JaCoCo midió **95,36% de líneas unitarias (864/906)** en total; por capa: domain **92,15%**, application **97,74%** e infrastructure **96,77%**. Failsafe no instrumenta el proceso de integración, por lo que los IT no incrementan la cobertura. `EmployeeResourceIT` valida el CRUD de empleado, la creación/consulta de una jornada y que al borrar al empleado la FK en cascada elimine la jornada; además, valida la carga bulk, el resumen semanal y que un bulk conflictivo responda 409 sin persistir jornadas parciales. No hay todavía pruebas HTTP de integración para todos los once endpoints ni para todos sus errores. La suite se ejecutó contra una base aislada vacía de PostgreSQL de Compose porque Dev Services no se pudo validar por incompatibilidad con la API Docker disponible.
+La ejecución integral del Frente 3 terminó correctamente: `verify` ejecutó **69 pruebas unitarias y 2 IT**, todas sin fallos, y JaCoCo aplicó el umbral de 80 %. JaCoCo midió **95,62% de líneas unitarias (896/937)**; por capa: domain **93,09%** (337/362), application **97,75%** (261/267) e infrastructure **96,75%** (298/308). Las pruebas nuevas cubren las vigencias del límite ordinario (47 h en 2024-W28 y 46 h en 2024-W29; 44 h en 2025-W29; 42 h en 2026-W29 y 2026-W42), el tope de horas extra (46 h reportan 4 extra y pasan; 55 h devuelven 409; 54 h exactas pasan), la ventana diurna/nocturna por fecha (18:00–22:00 deja 1 h nocturna el 2025-12-24 y 3 h el 2025-12-25; la misma ventana de la fecha de inicio aplica en turnos que cruzan medianoche) y la respuesta en horas decimales. Failsafe no instrumenta el proceso de integración, por lo que los IT no incrementan la cobertura. `EmployeeResourceIT` valida el CRUD de empleado, la creación/consulta de una jornada (con horas decimales y `HH:mm`) y que al borrar al empleado la FK en cascada elimine la jornada; además, valida la carga bulk, el resumen semanal con `ordinaryLimitHours`/`overtimeHours` y que un bulk conflictivo responda 409 sin persistir jornadas parciales. No hay todavía pruebas HTTP de integración para todos los once endpoints ni para todos sus errores. La suite se ejecutó contra PostgreSQL de Compose (`employees_api_v2`, Flyway en V5) porque Dev Services no se pudo validar por incompatibilidad con la API Docker disponible.
 
-`docker compose config --quiet` pasó y `docker compose build app` construyó la imagen actualizada. El Compose local se redesplegó con `employees_api_v2`; Flyway quedó en V4, health respondió `200`, OpenAPI publica las once operaciones y Swagger UI carga con `200`. La nueva base contiene tres empleados y 17 jornadas semilla. Se eliminó la base anterior `employees_db` después de validar la nueva; se conservó el volumen PostgreSQL.
+`docker compose config --quiet` pasó y `docker compose build app` construyó la imagen actualizada. El Compose local se redesplegó con `employees_api_v2`; Flyway quedó en **V5** (semilla de horas extra), health respondió `200`, OpenAPI publica las once operaciones y Swagger UI carga con `200`. La base contiene tres empleados y 18 jornadas semilla (la semana 2026-W42 con 46 h → 4 h extra). Se conserva el volumen PostgreSQL entre redespliegues; al terminar la demostración, ejecuta `docker compose down` sin borrarlo.
 
 ## Arquitectura y diseño
 
@@ -289,7 +334,10 @@ Decisiones relevantes:
 | UUID para la jornada | Identifica una jornada de forma única, pero siempre se consulta bajo el documento dueño. |
 | `hireDate` y documento inmutables | Evita que un PUT cambie la identidad o la historia laboral; corregir un documento digitado incorrectamente exige eliminar y crear el registro. |
 | Clave foránea documental compuesta | Mantiene la relación de jornadas con la identidad natural del empleado y aplica cascada al borrado físico. |
-| Horas semanales ISO calculadas en dominio | Centraliza el tope de 42 horas y permite repartir los turnos que atraviesan medianoche sin un endpoint de resumen adicional. |
+| Horas semanales ISO calculadas en dominio | Centraliza el criterio semanal y permite repartir los turnos que atraviesan medianoche sin un endpoint de resumen adicional. |
+| Parámetros legales por vigencia (`WeeklyWorkloadPolicy`, `DayNightPolicy`) | El límite ordinario (48/47/46/44/42 h, Ley 2101 de 2021) y la ventana diurna/nocturna (Ley 2466 de 2025) cambian con el tiempo; se representan como tablas de vigencias inmutables y no como constantes únicas, y se corrijen en el dominio con Java puro. |
+| Horas extra informadas, no bloqueadas | Superar el límite ordinario se reporta en `overtimeHours`; solo se rechaza (409) al superar 12 h extra semanales (art. 22, Ley 50 de 1990, modificado por la Ley 2466 de 2025). Supuestos por defecto: no se valida el tope diario de 2 h extra. |
+| Horas decimales y `HH:mm` en la respuesta | Las duraciones de dominio (`Duration`) se convierten a horas decimales de 2 decimales al serializar; evita segundos crudos (`28800`) y facilita la lectura en Swagger UI. |
 | Carga bulk de una franja | Simplifica la carga repetitiva; todas las fechas se validan antes de guardar y el adaptador persiste la lista en una transacción. |
 | Sin modelo de pausas | Para registrar almuerzo se crean dos jornadas no solapadas. Por ello, una jornada continua 08:00–17:00 contabiliza 9 horas. |
 | Validación explícita de V3 | La base anterior no guardaba tipo documental. V3 convierte las tres semillas conocidas y detiene la migración ante documentos alfanuméricos restantes para que se clasifiquen explícitamente, sin inventar su tipo. |
@@ -305,7 +353,7 @@ En esta sesión utilicé GitHub Copilot integrado en VS Code, con el modelo GPT-
 
 ### 2. ¿Cómo verificaste que el código generado por IA sea correcto con tu propuesta de solución?
 
-La última ejecución integral de `verify` pasó con 59 pruebas unitarias, 2 IT y el umbral JaCoCo; la cobertura unitaria medida fue 95,36% (864/906 líneas: domain 92,15%, application 97,74% e infrastructure 96,77%). `EmployeeResourceIT` comprobó contra PostgreSQL 15 el arranque de Hibernate y Flyway, las rutas documentales del empleado, la creación/consulta de una jornada, el borrado en cascada, la carga bulk, el resumen semanal y el rechazo atómico de una carga conflictiva. Durante la revisión de la base previa, V3 se detuvo de forma segura al encontrar documentos legados que requerían clasificación manual. Para el redespliegue se creó una base limpia y se eliminó la base anterior por solicitud del usuario, conservando el volumen PostgreSQL. Dev Services no se validó por incompatibilidad con la API Docker disponible. También revisé manualmente que `domain` y `application` no importen APIs de framework. La imagen redesplegada reporta health `200`, Swagger UI carga con `200` y OpenAPI publica las once operaciones.
+La última ejecución integral de `verify` pasó con 69 pruebas unitarias, 2 IT y el umbral JaCoCo; la cobertura unitaria medida fue 95,62% (896/937 líneas: domain 93,09%, application 97,75% e infrastructure 96,75%). `EmployeeResourceIT` comprobó contra PostgreSQL 15 el arranque de Hibernate y Flyway, las rutas documentales del empleado, la creación/consulta de una jornada con el contrato `HH:mm` y horas decimales, el borrado en cascada, la carga bulk, el resumen semanal con `ordinaryLimitHours` y `overtimeHours`, y el rechazo atómico de una carga conflictiva. Flyway aplicó la migración V5 (semilla de horas extra) contra la base `employees_api_v2`. Durante la revisión de la base previa, V3 se detuvo de forma segura al encontrar documentos legados que requerían clasificación manual. Para el redespliegue se creó una base limpia y se eliminó la base anterior por solicitud del usuario, conservando el volumen PostgreSQL. Dev Services no se validó por incompatibilidad con la API Docker disponible. También revisé manualmente que `domain` y `application` no importen APIs de framework. La imagen redesplegada con la respuesta en horas decimales reporta health `200`, Swagger UI carga con `200` y OpenAPI publica las once operaciones.
 
 ### 3. ¿Qué riesgos ves en utilizar código generado por IA?
 
@@ -327,6 +375,7 @@ En esta sesión utilicé IA durante el análisis y revisión del proyecto, la im
 | Crear un endpoint separado para el resumen semanal | Rechacé el endpoint nuevo; añadí `weeklySummaries` al GET de jornadas existente | Decidí mantener un contrato acotado y consultar jornadas, totales y carga semanal en una sola respuesta. |
 | Permitir actualizar `hireDate` con el resto de campos | Rechacé actualizar `hireDate`; es inmutable tras la creación | Decidí conservar la fecha como dato histórico; un PUT con una fecha distinta devuelve `400`. |
 | Diseñar jornadas sin las reglas laborales colombianas | Reemplacé el diseño por la clasificación de días/horas, cruce de medianoche y tope semanal de 42 horas | Decidí aterrizar el modelo a Colombia y cortar la carga por semana ISO, en lugar de limitarme a persistir franjas horarias. |
+| Fijar el tope semanal en 42 h, la ventana nocturna en 21:00 y las duraciones en segundos para cualquier fecha | Lo reemplazó el usuario: vigencias legales por fecha (Ley 2101 de 2021 y Ley 2466 de 2025), horas extra reportadas con tope de 12 h y duraciones en horas decimales | Durante la auditoría el usuario señaló que 42 h no regían en 2024 (47 h), que la ventana nocturna cambió con la Ley 2466 de 2025 y que los segundos crudos no eran legibles; implementé la corrección en vez de parchear encima. |
 | Forzar Testcontainers/docker-java 1.20.4/3.4.0 para corregir Dev Services | Retirado tras comprobarlo | Quarkus 3.8.5 seguía cargando su cliente Docker aislado; el fallback hacia PostgreSQL de Compose pasó el IT. |
 | Usar `Matchers.isEmptyOrNullString()` para verificar `Location` | Reemplazado por aserciones JUnit de presencia y contenido no blanco | El matcher estaba marcado como deprecated; las aserciones JUnit evitan la API obsoleta y verifican explícitamente el encabezado. |
 | Diagnóstico inicial genérico del warning de varargs como un `thenReturn(query)` | Corregido al revisar la línea seleccionada; se encadenaron respuestas de un solo valor en los stubbings afectados | El warning real se originaba en varios valores pasados al varargs de Mockito (`Stream` y `TypedQuery`). El encadenamiento conserva las respuestas secuenciales y elimina la creación del array genérico. |
