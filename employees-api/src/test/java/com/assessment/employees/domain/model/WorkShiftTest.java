@@ -1,5 +1,6 @@
 package com.assessment.employees.domain.model;
 
+import com.assessment.employees.domain.exception.InvalidWorkShiftException;
 import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -141,7 +142,7 @@ class WorkShiftTest {
 
         assertEquals(LocalDate.of(2026, 10, 17), overnight.getEndDate());
         assertEquals(Duration.ofHours(8), overnight.getWorkedHours());
-        assertThrows(IllegalArgumentException.class, () -> WorkShift.create(
+        assertThrows(InvalidWorkShiftException.class, () -> WorkShift.create(
             employeeId,
             LocalDate.of(2026, 10, 16),
             LocalTime.of(8, 0),

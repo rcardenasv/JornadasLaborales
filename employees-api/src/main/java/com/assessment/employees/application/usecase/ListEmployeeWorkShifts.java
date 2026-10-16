@@ -4,6 +4,7 @@ import com.assessment.employees.application.dto.WeeklyWorkloadSummaryResult;
 import com.assessment.employees.application.dto.WorkShiftListResult;
 import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
+import com.assessment.employees.domain.exception.InvalidDateRangeException;
 import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
 import com.assessment.employees.domain.model.WorkShift;
@@ -37,7 +38,7 @@ public class ListEmployeeWorkShifts {
         }
 
         if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("La fecha desde no puede ser posterior a la fecha hasta.");
+            throw new InvalidDateRangeException("La fecha desde no puede ser posterior a la fecha hasta.");
         }
 
         LocalDate queryFrom = from == null ? null : weekStart(from).minusDays(1);

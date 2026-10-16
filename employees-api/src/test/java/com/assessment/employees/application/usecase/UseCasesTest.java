@@ -222,7 +222,7 @@ class UseCasesTest {
 
         assertTrue(useCase.execute(TYPE, NUMBER, null, null).shifts().isEmpty());
         assertTrue(useCase.execute(TYPE, NUMBER, LocalDate.now(), null).shifts().isEmpty());
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(InvalidDateRangeException.class,
             () -> useCase.execute(TYPE, NUMBER, LocalDate.now(), LocalDate.now().minusDays(1)));
         assertThrows(EmployeeNotFoundException.class,
             () -> useCase.execute(TYPE, NUMBER, null, null));

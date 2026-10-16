@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class PersistenceMapperTest {
     @Test
     void mapsEmployeeToEntityAndBack() {
-        Employee employee = Employee.create("EMP001", "Ana", "Diaz", "ana@example.com",
-            "Analyst", LocalDate.now());
+        Employee employee = Employee.create(Document.of("PA", "EMP001"), "Ana", "Diaz",
+            "ana@example.com", "Analyst", LocalDate.now());
         EmployeeEntity entity = EmployeeMapper.toEntity(employee);
         Employee restored = EmployeeMapper.toDomain(entity);
         assertEquals(employee.getId().value(), entity.getId());

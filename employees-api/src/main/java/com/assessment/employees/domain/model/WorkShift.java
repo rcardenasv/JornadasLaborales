@@ -1,5 +1,7 @@
 package com.assessment.employees.domain.model;
 
+import com.assessment.employees.domain.exception.InvalidWorkShiftException;
+
 import java.time.Duration;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -76,19 +78,19 @@ public class WorkShift {
 
     private void validate() {
         if (employeeDocument == null) {
-            throw new IllegalArgumentException("Employee document cannot be null");
+            throw new InvalidWorkShiftException("El empleado de la jornada es obligatorio.");
         }
         if (date == null) {
-            throw new IllegalArgumentException("Date cannot be null");
+            throw new InvalidWorkShiftException("La fecha de la jornada es obligatoria.");
         }
         if (startTime == null) {
-            throw new IllegalArgumentException("Start time cannot be null");
+            throw new InvalidWorkShiftException("La hora de inicio de la jornada es obligatoria.");
         }
         if (endTime == null) {
-            throw new IllegalArgumentException("End time cannot be null");
+            throw new InvalidWorkShiftException("La hora de fin de la jornada es obligatoria.");
         }
         if (endTime.value().equals(startTime.value())) {
-            throw new IllegalArgumentException("End time must differ from start time");
+            throw new InvalidWorkShiftException("La hora de fin debe ser distinta de la hora de inicio.");
         }
     }
 

@@ -64,12 +64,7 @@ public class Employee {
         );
     }
 
-    public static Employee create(String documentNumber, String firstName, String lastName,
-                                  String email, String position, LocalDate hireDate) {
-        return create(Document.of("PA", documentNumber),
-            firstName, lastName, email, position, hireDate);
-    }
-    
+    /** Actualiza los campos editables: solo los valores no nulos cambian. */
     public void update(String firstName, String lastName, String email, String position) {
         validateEditableFields(firstName, lastName, email, position);
         if (firstName != null) {

@@ -4,6 +4,7 @@ import com.assessment.employees.domain.exception.DuplicateEmployeeException;
 import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.exception.InvalidDateRangeException;
 import com.assessment.employees.domain.exception.InvalidEmployeeDataException;
+import com.assessment.employees.domain.exception.InvalidWorkShiftException;
 import com.assessment.employees.domain.exception.WeeklyHoursExceededException;
 import com.assessment.employees.domain.exception.WorkShiftBulkConflictException;
 import com.assessment.employees.domain.exception.WorkShiftNotFoundException;
@@ -44,7 +45,8 @@ public class GlobalExceptionHandler implements ExceptionMapper<Throwable> {
         if (exception instanceof DuplicateEmployeeException) {
             return respond(Problem.conflict("Ya existe un empleado con ese correo o número de documento."));
         }
-        if (exception instanceof InvalidEmployeeDataException) {
+        if (exception instanceof InvalidEmployeeDataException
+                || exception instanceof InvalidWorkShiftException) {
             return respond(Problem.badRequest(exception.getMessage()));
         }
         if (exception instanceof WorkShiftOverlapException) {

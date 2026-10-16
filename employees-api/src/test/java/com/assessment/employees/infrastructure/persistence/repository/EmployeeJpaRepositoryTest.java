@@ -1,5 +1,6 @@
 package com.assessment.employees.infrastructure.persistence.repository;
 
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.Employee;
 import com.assessment.employees.domain.model.EmployeeId;
 import com.assessment.employees.infrastructure.persistence.entity.EmployeeEntity;
@@ -54,24 +55,21 @@ class EmployeeJpaRepositoryTest {
     }
 
     @Test
-    void shouldFindByEmailAndDocumentNumber() {
+    void shouldFindByEmail() {
         EmployeeEntity entity = entity();
         when(entityManager.createQuery(anyString(), eq(EmployeeEntity.class)))
-            .thenReturn(employeeQuery)
             .thenReturn(employeeQuery);
         when(employeeQuery.setParameter(anyString(), any())).thenReturn(employeeQuery);
-        when(employeeQuery.getResultStream()).thenReturn(Stream.of(entity)).thenReturn(Stream.empty());
+        when(employeeQuery.getResultStream()).thenReturn(Stream.of(entity));
 
         assertEquals(entity.getEmail(), repository.findByEmail(entity.getEmail()).orElseThrow()
             .getEmail().value());
-        assertTrue(repository.findByDocumentNumber(entity.getDocumentNumber()).isEmpty());
-        verify(employeeQuery, times(2)).setParameter(anyString(), any());
+        verify(employeeQuery).setParameter(anyString(), any());
     }
 
     @Test
-    void shouldPageCountAndCheckExistence() {
+    void shouldPageAndCount() {
         EmployeeEntity entity = entity();
-        when(entityManager.find(EmployeeEntity.class, entity.getId())).thenReturn(entity);
         when(entityManager.createQuery(anyString(), eq(EmployeeEntity.class))).thenReturn(employeeQuery);
         when(employeeQuery.setFirstResult(10)).thenReturn(employeeQuery);
         when(employeeQuery.setMaxResults(5)).thenReturn(employeeQuery);
@@ -79,7 +77,6 @@ class EmployeeJpaRepositoryTest {
         when(entityManager.createQuery("SELECT COUNT(e) FROM EmployeeEntity e", Long.class)).thenReturn(countQuery);
         when(countQuery.getSingleResult()).thenReturn(21L);
 
-        assertTrue(repository.existsById(new EmployeeId(entity.getId())));
         assertEquals(1, repository.findPage(10, 5).size());
         assertEquals(21L, repository.count());
         verify(employeeQuery).setFirstResult(10);
@@ -98,7 +95,8 @@ class EmployeeJpaRepositoryTest {
     }
 
     private Employee employee() {
-        return Employee.create("EMP001", "Ana", "Diaz", "ana@example.com", "Analyst", LocalDate.now());
+        return Employee.create(Document.of("PA", "EMP001"), "Ana", "Diaz", "ana@example.com",
+            "Analyst", LocalDate.now());
     }
 
     private EmployeeEntity entity() {

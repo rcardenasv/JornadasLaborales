@@ -8,7 +8,7 @@ import java.time.LocalTime;
  */
 public class WorkShiftOverlapException extends DomainException {
     public WorkShiftOverlapException(LocalDate date, LocalTime startTime, LocalTime endTime) {
-        super("Work shift overlaps with existing shift on " + date + 
-              " between " + startTime + " and " + endTime);
+        super("La jornada del " + date + " (de " + startTime + " a " + endTime
+            + ") se solapa con otra jornada del empleado.");
     }
 }

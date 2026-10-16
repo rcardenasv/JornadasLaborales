@@ -43,19 +43,6 @@ public class EmployeeJpaRepository implements EmployeeRepository {
     }
     
     @Override
-    public Optional<Employee> findByDocumentNumber(String documentNumber) {
-        TypedQuery<EmployeeEntity> query = entityManager.createQuery(
-            "SELECT e FROM EmployeeEntity e WHERE e.documentNumber = :docNumber",
-            EmployeeEntity.class
-        );
-        query.setParameter("docNumber", documentNumber);
-        
-        return query.getResultStream()
-                .findFirst()
-                .map(EmployeeMapper::toDomain);
-    }
-
-    @Override
     public Optional<Employee> findByDocument(Document document) {
         TypedQuery<EmployeeEntity> query = entityManager.createQuery(
             "SELECT e FROM EmployeeEntity e WHERE e.documentType = :documentType " +
@@ -87,11 +74,6 @@ public class EmployeeJpaRepository implements EmployeeRepository {
         if (entity != null) {
             entityManager.remove(entity);
         }
-    }
-    
-    @Override
-    public boolean existsById(EmployeeId id) {
-        return entityManager.find(EmployeeEntity.class, id.value()) != null;
     }
     
     @Override

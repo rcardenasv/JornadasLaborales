@@ -9,51 +9,34 @@ import java.util.Optional;
 
 /**
  * Port for Employee persistence operations.
- * Defines the interface for data access in the domain layer.
+ * El empleado se identifica siempre por su clave natural
+ * (tipo y número de documento).
  */
 public interface EmployeeRepository {
     /**
      * Saves an employee.
      */
     Employee save(Employee employee);
-    
+
     /**
-     * Finds an employee by ID.
+     * Finds an employee by technical internal ID.
      */
     Optional<Employee> findById(EmployeeId id);
-    
-    /**
-     * Finds an employee by document number.
-     */
-    Optional<Employee> findByDocumentNumber(String documentNumber);
 
-    default Optional<Employee> findByDocument(Document document) {
-        return findByDocumentNumber(document.number())
-            .filter(employee -> employee.getDocument().equals(document));
-    }
-    
+    /**
+     * Finds an employee by its natural identity (document type + number).
+     */
+    Optional<Employee> findByDocument(Document document);
+
     /**
      * Finds an employee by email.
      */
     Optional<Employee> findByEmail(String email);
-    
+
     /**
-     * Deletes an employee by ID.
+     * Deletes an employee by ID. The deletion cascades to work shifts.
      */
     void deleteById(EmployeeId id);
-
-    default void deleteByDocument(Document document) {
-        findByDocument(document).ifPresent(employee -> deleteById(employee.getId()));
-    }
-
-    /**
-     * Checks if an employee exists by ID.
-     */
-    boolean existsById(EmployeeId id);
-
-    default boolean existsByDocument(Document document) {
-        return findByDocument(document).isPresent();
-    }
 
     /**
      * Finds a stable page of employees.

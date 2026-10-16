@@ -22,7 +22,8 @@ class GlobalExceptionHandlerTest {
     void mapsDomainAndValidationErrorsToProblemJson() {
         assertProblem(handler.toResponse(new EmployeeNotFoundException(Document.of("CC", "123456"))), 404);
         assertProblem(handler.toResponse(new WorkShiftNotFoundException(UUID.randomUUID())), 404);
-        assertProblem(handler.toResponse(new DuplicateEmployeeException("email", "x@example.com")), 409);
+        assertProblem(handler.toResponse(new DuplicateEmployeeException("correo")), 409);
+        assertProblem(handler.toResponse(new InvalidWorkShiftException("Jornada inválida.")), 400);
         assertProblem(handler.toResponse(new WorkShiftOverlapException(LocalDate.now(),
             LocalTime.of(9, 0), LocalTime.of(17, 0))), 409);
         assertProblem(handler.toResponse(new WeeklyHoursExceededException(LocalDate.now(),

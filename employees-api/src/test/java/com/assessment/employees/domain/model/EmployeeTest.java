@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class EmployeeTest {
     @Test
     void shouldCreateEmployee() {
-        Employee emp = Employee.create("DOC123", "John", "Doe", "john@test.com", "Dev", LocalDate.now());
+        Employee emp = Employee.create(Document.of("PA", "DOC123"), "John", "Doe",
+            "john@test.com", "Dev", LocalDate.now());
         assertNotNull(emp.getId());
         assertEquals("DOC123", emp.getDocumentNumber());
         assertEquals(DocumentType.PA, emp.getDocumentType());

@@ -31,13 +31,10 @@ class ValueObjectsTest {
     }
 
     @Test
-    void emailAndDocumentNumberValidateInput() {
+    void emailValidatesInput() {
         assertEquals("ana@example.com", Email.of("ana@example.com").value());
         assertThrows(IllegalArgumentException.class, () -> Email.of("invalid"));
         assertThrows(IllegalArgumentException.class, () -> Email.of(" "));
-        assertEquals("EMP001", DocumentNumber.of("EMP001").value());
-        assertThrows(IllegalArgumentException.class, () -> DocumentNumber.of("12"));
-        assertThrows(IllegalArgumentException.class, () -> DocumentNumber.of("EMP-001"));
     }
 
     @Test

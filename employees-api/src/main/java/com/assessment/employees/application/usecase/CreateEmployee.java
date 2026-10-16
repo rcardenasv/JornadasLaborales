@@ -21,12 +21,12 @@ public class CreateEmployee {
         Document document = Document.of(command.documentType(), command.documentNumber());
         // Check for duplicate email
         if (repository.findByEmail(command.email()).isPresent()) {
-            throw new DuplicateEmployeeException("email", command.email());
+            throw new DuplicateEmployeeException("correo");
         }
         
         // Check for duplicate document number
         if (repository.findByDocument(document).isPresent()) {
-            throw new DuplicateEmployeeException("document number", command.documentNumber());
+            throw new DuplicateEmployeeException("documento");
         }
         
         // Create employee

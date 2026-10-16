@@ -1,18 +1,20 @@
 package com.assessment.employees.infrastructure.rest.error;
 
-import java.time.Instant;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * Problem Details for HTTP APIs (RFC 7807).
+ * Solo incluye los campos previstos en el contrato; `errors` aparece únicamente
+ * en errores de validación.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record Problem(
     String type,
     String title,
     int status,
     String detail,
     String instance,
-    Object errors,
-    Instant timestamp
+    Object errors
 ) {
     public static Problem validationError(String message, Object errors) {
         return new Problem(
@@ -21,11 +23,10 @@ public record Problem(
             400,
             message,
             null,
-            errors,
-            Instant.now()
+            errors
         );
     }
-    
+
     public static Problem notFound(String message) {
         return new Problem(
             "https://tools.ietf.org/html/rfc7807#section-3.1",
@@ -33,11 +34,10 @@ public record Problem(
             404,
             message,
             null,
-            null,
-            Instant.now()
+            null
         );
     }
-    
+
     public static Problem conflict(String message) {
         return new Problem(
             "https://tools.ietf.org/html/rfc7807#section-3.1",
@@ -45,11 +45,10 @@ public record Problem(
             409,
             message,
             null,
-            null,
-            Instant.now()
+            null
         );
     }
-    
+
     public static Problem internalError(String message) {
         return new Problem(
             "https://tools.ietf.org/html/rfc7807#section-3.1",
@@ -57,8 +56,7 @@ public record Problem(
             500,
             message,
             null,
-            null,
-            Instant.now()
+            null
         );
     }
 
@@ -67,6 +65,6 @@ public record Problem(
     }
 
     public Problem withInstance(String requestPath) {
-        return new Problem(type, title, status, detail, requestPath, errors, timestamp);
+        return new Problem(type, title, status, detail, requestPath, errors);
     }
 }

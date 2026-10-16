@@ -32,7 +32,7 @@ public class UpdateEmployee {
         if (command.email() != null) {
             repository.findByEmail(command.email()).ifPresent(emp -> {
                 if (!emp.getDocument().equals(document)) {
-                    throw new DuplicateEmployeeException("email", command.email());
+                    throw new DuplicateEmployeeException("correo");
                 }
             });
         }

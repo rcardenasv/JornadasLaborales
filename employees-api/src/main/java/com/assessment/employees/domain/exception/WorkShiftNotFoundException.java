@@ -7,6 +7,6 @@ import java.util.UUID;
  */
 public class WorkShiftNotFoundException extends DomainException {
     public WorkShiftNotFoundException(UUID id) {
-        super("Work shift with id " + id + " not found");
+        super("No se encontró la jornada con el identificador " + id + ".");
     }
 }
