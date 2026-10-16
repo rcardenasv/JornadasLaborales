@@ -6,6 +6,7 @@ import com.assessment.employees.application.dto.UpdateWorkShiftCommand;
 import com.assessment.employees.application.dto.WeeklyWorkloadSummaryResult;
 import com.assessment.employees.application.dto.WorkShiftListResult;
 import com.assessment.employees.application.dto.WorkShiftResult;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
 import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.UpdateWorkShiftRequest;
@@ -40,8 +41,7 @@ public final class WorkShiftMapper {
     public static CreateWorkShiftCommand toCommand(String documentType, String documentNumber,
                                                     CreateWorkShiftRequest request) {
         return new CreateWorkShiftCommand(
-            documentType,
-            documentNumber,
+            Document.of(documentType, documentNumber),
             request.date(),
             request.startTime(),
             request.endTime()
@@ -51,8 +51,7 @@ public final class WorkShiftMapper {
     public static BulkCreateWorkShiftsCommand toCommand(String documentType, String documentNumber,
                                                          BulkCreateWorkShiftsRequest request) {
         return new BulkCreateWorkShiftsCommand(
-            documentType,
-            documentNumber,
+            Document.of(documentType, documentNumber),
             request.from(),
             request.to(),
             request.weekdays(),
@@ -61,17 +60,24 @@ public final class WorkShiftMapper {
         );
     }
 
-    public static UpdateWorkShiftCommand toCommand(UUID shiftId, String documentType,
-                                                   String documentNumber,
+    public static UpdateWorkShiftCommand toCommand(UUID shiftId, Document document,
                                                    UpdateWorkShiftRequest request) {
         return new UpdateWorkShiftCommand(
             shiftId,
-            documentType,
-            documentNumber,
+            document,
             request.date(),
             request.startTime(),
             request.endTime()
         );
+    }
+
+    /** Convierte el identificador textual de la ruta en UUID (formato inválido → 400). */
+    public static UUID toShiftId(String shiftId) {
+        return UUID.fromString(shiftId);
+    }
+
+    public static Document toDocument(String documentType, String documentNumber) {
+        return Document.of(documentType, documentNumber);
     }
 
     public static WorkShiftResponse toResponse(WorkShiftResult result) {

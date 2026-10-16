@@ -131,7 +131,7 @@ public class WorkShiftResource {
                          @Parameter(description = "Fecha final inclusiva (yyyy-MM-dd)")
                          @QueryParam("to") String to) {
         return Response.ok(WorkShiftMapper.toListResponse(listWorkShifts.execute(
-            documentType, documentNumber,
+            WorkShiftMapper.toDocument(documentType, documentNumber),
             WorkShiftMapper.parseIsoDate(from), WorkShiftMapper.parseIsoDate(to)
         ))).build();
     }
@@ -147,7 +147,10 @@ public class WorkShiftResource {
     public Response get(@PathParam("documentType") String documentType,
                         @PathParam("documentNumber") String documentNumber,
                         @PathParam("shiftId") String shiftId) {
-        WorkShiftResult result = getWorkShift.execute(shiftId, documentType, documentNumber);
+        WorkShiftResult result = getWorkShift.execute(
+            WorkShiftMapper.toShiftId(shiftId),
+            WorkShiftMapper.toDocument(documentType, documentNumber)
+        );
         return Response.ok(WorkShiftMapper.toResponse(result)).build();
     }
 
@@ -165,7 +168,8 @@ public class WorkShiftResource {
                            @PathParam("shiftId") String shiftId,
                            @Valid UpdateWorkShiftRequest request) {
         WorkShiftResult result = updateWorkShift.execute(WorkShiftMapper.toCommand(
-            java.util.UUID.fromString(shiftId), documentType, documentNumber, request
+            WorkShiftMapper.toShiftId(shiftId),
+            WorkShiftMapper.toDocument(documentType, documentNumber), request
         ));
         return Response.ok(WorkShiftMapper.toResponse(result)).build();
     }
@@ -181,7 +185,10 @@ public class WorkShiftResource {
     public Response delete(@PathParam("documentType") String documentType,
                            @PathParam("documentNumber") String documentNumber,
                            @PathParam("shiftId") String shiftId) {
-        deleteWorkShift.execute(shiftId, documentType, documentNumber);
+        deleteWorkShift.execute(
+            WorkShiftMapper.toShiftId(shiftId),
+            WorkShiftMapper.toDocument(documentType, documentNumber)
+        );
         return Response.noContent().build();
     }
 }

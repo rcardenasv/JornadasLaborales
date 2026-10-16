@@ -25,7 +25,7 @@ public class UpdateWorkShift {
 
     public WorkShiftResult execute(UpdateWorkShiftCommand command) {
         UUID id = command.id();
-        Document document = Document.of(command.documentType(), command.documentNumber());
+        Document document = command.document();
         WorkShift existing = workShiftRepository.findById(id)
             .filter(shift -> shift.getEmployeeDocument().equals(document))
             .orElseThrow(() -> new WorkShiftNotFoundException(id));

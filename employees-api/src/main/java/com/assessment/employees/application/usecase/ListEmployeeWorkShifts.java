@@ -30,9 +30,7 @@ public class ListEmployeeWorkShifts {
         this.employeeRepository = employeeRepository;
     }
     
-    public WorkShiftListResult execute(String documentType, String documentNumber,
-                                       LocalDate from, LocalDate to) {
-        Document document = Document.of(documentType, documentNumber);
+    public WorkShiftListResult execute(Document document, LocalDate from, LocalDate to) {
         if (employeeRepository.findByDocument(document).isEmpty()) {
             throw new EmployeeNotFoundException(document);
         }

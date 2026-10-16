@@ -15,8 +15,7 @@ public class GetEmployee {
         this.repository = repository;
     }
     
-    public EmployeeResult execute(String documentType, String documentNumber) {
-        Document document = Document.of(documentType, documentNumber);
+    public EmployeeResult execute(Document document) {
         return repository.findByDocument(document)
             .map(EmployeeResult::fromDomain)
             .orElseThrow(() -> new EmployeeNotFoundException(document));

@@ -15,8 +15,7 @@ public class DeleteEmployee {
         this.repository = repository;
     }
     
-    public void execute(String documentType, String documentNumber) {
-        Document document = Document.of(documentType, documentNumber);
+    public void execute(Document document) {
         Employee employee = repository.findByDocument(document)
             .orElseThrow(() -> new EmployeeNotFoundException(document));
         repository.deleteById(employee.getId());

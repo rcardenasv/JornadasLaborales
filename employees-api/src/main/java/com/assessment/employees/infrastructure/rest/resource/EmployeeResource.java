@@ -106,7 +106,7 @@ public class EmployeeResource {
                         @PathParam("documentType") String documentType,
                         @Parameter(description = "Número de documento", example = "123456789")
                         @PathParam("documentNumber") String documentNumber) {
-        EmployeeResult result = getEmployee.execute(documentType, documentNumber);
+        EmployeeResult result = getEmployee.execute(EmployeeMapper.toDocument(documentType, documentNumber));
         return Response.ok(EmployeeMapper.toResponse(result)).build();
     }
     
@@ -141,7 +141,7 @@ public class EmployeeResource {
                            @PathParam("documentType") String documentType,
                            @Parameter(description = "Número de documento", example = "123456789")
                            @PathParam("documentNumber") String documentNumber) {
-        deleteEmployee.execute(documentType, documentNumber);
+        deleteEmployee.execute(EmployeeMapper.toDocument(documentType, documentNumber));
         return Response.noContent().build();
     }
 }

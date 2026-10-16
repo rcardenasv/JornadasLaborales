@@ -1,5 +1,7 @@
 package com.assessment.employees.application.dto;
 
+import com.assessment.employees.domain.model.Document;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
@@ -9,8 +11,7 @@ import java.util.UUID;
  */
 public record UpdateWorkShiftCommand(
     UUID id,
-    String documentType,
-    String documentNumber,
+    Document document,
     LocalDate date,
     LocalTime startTime,
     LocalTime endTime

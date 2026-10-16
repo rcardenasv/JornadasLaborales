@@ -75,10 +75,10 @@ class UseCasesTest {
 
         CreateEmployee create = createEmployee();
         EmployeeResult cc = create.execute(new CreateEmployeeCommand(
-            "CC", "111", "Ana", "Diaz", "cc@example.com", "Analyst", TODAY
+            Document.of("CC", "111"), "Ana", "Diaz", "cc@example.com", "Analyst", TODAY
         ));
         EmployeeResult ce = create.execute(new CreateEmployeeCommand(
-            "CE", "111", "Bea", "Lopez", "ce@example.com", "Analyst", TODAY
+            Document.of("CE", "111"), "Bea", "Lopez", "ce@example.com", "Analyst", TODAY
         ));
 
         assertEquals(cc.documentNumber(), ce.documentNumber());
@@ -92,8 +92,8 @@ class UseCasesTest {
             .thenAnswer(call -> Optional.empty());
         GetEmployee useCase = new GetEmployee(employees);
 
-        assertEquals(NUMBER, useCase.execute(TYPE, NUMBER).documentNumber());
-        assertThrows(EmployeeNotFoundException.class, () -> useCase.execute(TYPE, NUMBER));
+        assertEquals(NUMBER, useCase.execute(DOCUMENT).documentNumber());
+        assertThrows(EmployeeNotFoundException.class, () -> useCase.execute(DOCUMENT));
     }
 
     @Test
@@ -141,7 +141,7 @@ class UseCasesTest {
         when(employees.save(current)).thenReturn(current);
 
         EmployeeResult result = useCase.execute(new UpdateEmployeeCommand(
-            TYPE, NUMBER, null, null, null, "Senior Analyst", null));
+            DOCUMENT, null, null, null, "Senior Analyst", null));
 
         assertEquals("Senior Analyst", result.position());
         assertEquals("Ana", result.firstName());
@@ -149,7 +149,7 @@ class UseCasesTest {
         verify(employees, never()).findByEmail(any());
 
         assertThrows(InvalidEmployeeDataException.class, () -> useCase.execute(
-            new UpdateEmployeeCommand(TYPE, NUMBER, null, null, null, null, null)));
+            new UpdateEmployeeCommand(DOCUMENT, null, null, null, null, null)));
         verify(employees, times(1)).save(current);
     }
 
@@ -162,11 +162,11 @@ class UseCasesTest {
         when(employees.save(current)).thenReturn(current);
 
         useCase.execute(new UpdateEmployeeCommand(
-            TYPE, NUMBER, "Ana Dos", null, null, null, null));
+            DOCUMENT, "Ana Dos", null, null, null, null));
         assertEquals("Ana Dos", current.getFirstName());
 
         assertThrows(InvalidEmployeeDataException.class, () -> useCase.execute(
-            new UpdateEmployeeCommand(TYPE, NUMBER, null, null, "ana@example.com",
+            new UpdateEmployeeCommand(DOCUMENT, null, null, "ana@example.com",
                 null, LocalDate.now().minusDays(1))));
     }
 
@@ -177,10 +177,10 @@ class UseCasesTest {
             .thenAnswer(call -> Optional.empty());
         DeleteEmployee useCase = new DeleteEmployee(employees);
 
-        useCase.execute(TYPE, NUMBER);
+        useCase.execute(DOCUMENT);
 
         verify(employees).deleteById(existing.getId());
-        assertThrows(EmployeeNotFoundException.class, () -> useCase.execute(TYPE, NUMBER));
+        assertThrows(EmployeeNotFoundException.class, () -> useCase.execute(DOCUMENT));
     }
 
     @Test
@@ -209,12 +209,12 @@ class UseCasesTest {
         GetWorkShift useCase = new GetWorkShift(shifts);
 
         assertEquals(existing.getId(),
-            useCase.execute(existing.getId().toString(), TYPE, NUMBER).id());
+            useCase.execute(existing.getId(), DOCUMENT).id());
         assertThrows(WorkShiftNotFoundException.class,
-            () -> useCase.execute(existing.getId().toString(), "CC", "123"));
+            () -> useCase.execute(existing.getId(), Document.of("CC", "123")));
         when(shifts.findById(existing.getId())).thenReturn(Optional.empty());
         assertThrows(WorkShiftNotFoundException.class,
-            () -> useCase.execute(existing.getId().toString(), TYPE, NUMBER));
+            () -> useCase.execute(existing.getId(), DOCUMENT));
     }
 
     @Test
@@ -227,12 +227,12 @@ class UseCasesTest {
         when(shifts.findByEmployeeDocumentAndDateRange(eq(DOCUMENT), any(), any())).thenReturn(List.of());
         ListEmployeeWorkShifts useCase = new ListEmployeeWorkShifts(shifts, employees);
 
-        assertTrue(useCase.execute(TYPE, NUMBER, null, null).shifts().isEmpty());
-        assertTrue(useCase.execute(TYPE, NUMBER, LocalDate.now(), null).shifts().isEmpty());
+        assertTrue(useCase.execute(DOCUMENT, null, null).shifts().isEmpty());
+        assertTrue(useCase.execute(DOCUMENT, LocalDate.now(), null).shifts().isEmpty());
         assertThrows(InvalidDateRangeException.class,
-            () -> useCase.execute(TYPE, NUMBER, LocalDate.now(), LocalDate.now().minusDays(1)));
+            () -> useCase.execute(DOCUMENT, LocalDate.now(), LocalDate.now().minusDays(1)));
         assertThrows(EmployeeNotFoundException.class,
-            () -> useCase.execute(TYPE, NUMBER, null, null));
+            () -> useCase.execute(DOCUMENT, null, null));
     }
 
     @Test
@@ -248,7 +248,7 @@ class UseCasesTest {
         )).thenReturn(List.of(sundayNight, mondayShift));
 
         WorkShiftListResult result = new ListEmployeeWorkShifts(shifts, employees)
-            .execute(TYPE, NUMBER, monday, monday);
+            .execute(DOCUMENT, monday, monday);
 
         assertEquals(1, result.shifts().size());
         assertEquals(Duration.ofHours(14), result.weeklySummaries().get(0).scheduledHours());
@@ -263,7 +263,7 @@ class UseCasesTest {
         when(shifts.findByEmployeeDocumentAndDateRange(eq(DOCUMENT), any(), any())).thenReturn(List.of());
         when(shifts.saveAll(anyList())).thenAnswer(call -> call.getArgument(0));
         BulkCreateWorkShiftsResult result = useCase.execute(new BulkCreateWorkShiftsCommand(
-            TYPE, NUMBER, monday, monday.plusDays(4),
+            DOCUMENT, monday, monday.plusDays(4),
             java.util.Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY),
             LocalTime.of(9, 0), LocalTime.of(17, 0)
         ));
@@ -286,7 +286,7 @@ class UseCasesTest {
 
         WorkShiftBulkConflictException exception = assertThrows(WorkShiftBulkConflictException.class,
             () -> new BulkCreateWorkShifts(shifts, employees).execute(new BulkCreateWorkShiftsCommand(
-                TYPE, NUMBER, monday, monday.plusDays(2), null,
+                DOCUMENT, monday, monday.plusDays(2), null,
                 LocalTime.of(9, 0), LocalTime.of(17, 0)
             )));
 
@@ -307,15 +307,15 @@ class UseCasesTest {
 
         WorkShiftBulkConflictException weeklyConflict = assertThrows(WorkShiftBulkConflictException.class,
             () -> useCase.execute(new BulkCreateWorkShiftsCommand(
-                TYPE, NUMBER, monday.plusDays(5), monday.plusDays(5), null,
+                DOCUMENT, monday.plusDays(5), monday.plusDays(5), null,
                 LocalTime.of(9, 0), LocalTime.MIDNIGHT
             )));
         assertEquals(List.of(monday.plusDays(5)), weeklyConflict.getConflictDates());
         assertThrows(InvalidDateRangeException.class, () -> useCase.execute(new BulkCreateWorkShiftsCommand(
-            TYPE, NUMBER, monday.plusDays(1), monday, null, LocalTime.of(9, 0), LocalTime.of(17, 0)
+            DOCUMENT, monday.plusDays(1), monday, null, LocalTime.of(9, 0), LocalTime.of(17, 0)
         )));
         assertThrows(InvalidDateRangeException.class, () -> useCase.execute(new BulkCreateWorkShiftsCommand(
-            TYPE, NUMBER, monday, monday.plusDays(2), java.util.Set.of(),
+            DOCUMENT, monday, monday.plusDays(2), java.util.Set.of(),
             LocalTime.of(9, 0), LocalTime.of(17, 0)
         )));
         verify(shifts, never()).saveAll(anyList());
@@ -328,7 +328,7 @@ class UseCasesTest {
 
         assertThrows(InvalidDateRangeException.class,
             () -> new BulkCreateWorkShifts(shifts, employees).execute(new BulkCreateWorkShiftsCommand(
-                TYPE, NUMBER, monday, monday.plusDays(2), java.util.Set.of(DayOfWeek.SUNDAY),
+                DOCUMENT, monday, monday.plusDays(2), java.util.Set.of(DayOfWeek.SUNDAY),
                 LocalTime.of(9, 0), LocalTime.of(17, 0)
             )));
         verify(shifts, never()).saveAll(anyList());
@@ -337,7 +337,7 @@ class UseCasesTest {
     @Test
     void updateShiftIgnoresItselfButRejectsOtherOverlapsAndMissingResources() {
         WorkShift current = shift();
-        UpdateWorkShiftCommand command = new UpdateWorkShiftCommand(current.getId(), TYPE, NUMBER,
+        UpdateWorkShiftCommand command = new UpdateWorkShiftCommand(current.getId(), DOCUMENT,
             current.getDate(), LocalTime.of(10, 0), LocalTime.of(18, 0));
         when(shifts.findById(current.getId())).thenReturn(Optional.of(current));
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(employee()));
@@ -365,17 +365,17 @@ class UseCasesTest {
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.of(employee()));
         DeleteWorkShift useCase = new DeleteWorkShift(shifts, employees);
 
-        useCase.execute(existing.getId().toString(), TYPE, NUMBER);
+        useCase.execute(existing.getId(), DOCUMENT);
         verify(shifts).deleteById(existing.getId());
         assertThrows(WorkShiftNotFoundException.class,
-            () -> useCase.execute(existing.getId().toString(), "CC", "123"));
+            () -> useCase.execute(existing.getId(), Document.of("CC", "123")));
         when(employees.findByDocument(DOCUMENT)).thenReturn(Optional.empty());
         assertThrows(EmployeeNotFoundException.class,
-            () -> useCase.execute(existing.getId().toString(), TYPE, NUMBER));
+            () -> useCase.execute(existing.getId(), DOCUMENT));
     }
 
     private CreateEmployeeCommand employeeCommand() {
-        return new CreateEmployeeCommand(TYPE, NUMBER, "Ana", "Diaz", "ana@example.com",
+        return new CreateEmployeeCommand(DOCUMENT, "Ana", "Diaz", "ana@example.com",
             "Analyst", TODAY);
     }
 
@@ -384,7 +384,7 @@ class UseCasesTest {
     }
 
     private UpdateEmployeeCommand employeeUpdate(String email, LocalDate hireDate) {
-        return new UpdateEmployeeCommand(TYPE, NUMBER, "Ana", "Diaz", email, "Analyst", hireDate);
+        return new UpdateEmployeeCommand(DOCUMENT, "Ana", "Diaz", email, "Analyst", hireDate);
     }
 
     private Employee employee() {
@@ -392,7 +392,7 @@ class UseCasesTest {
     }
 
     private CreateWorkShiftCommand shiftCommand() {
-        return new CreateWorkShiftCommand(TYPE, NUMBER, LocalDate.now(),
+        return new CreateWorkShiftCommand(DOCUMENT, LocalDate.now(),
             LocalTime.of(9, 0), LocalTime.of(17, 0));
     }
 

@@ -3,6 +3,7 @@ package com.assessment.employees.infrastructure.rest.resource;
 import com.assessment.employees.application.dto.EmployeePageResult;
 import com.assessment.employees.application.dto.EmployeeResult;
 import com.assessment.employees.application.dto.UpdateEmployeeCommand;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.application.usecase.*;
 import com.assessment.employees.infrastructure.rest.dto.CreateEmployeeRequest;
 import com.assessment.employees.infrastructure.rest.dto.PagedEmployeeResponse;
@@ -67,7 +68,8 @@ class EmployeeResourceTest {
 
     @Test
     void getUpdateAndDeleteDelegateWithDocumentPath() {
-        when(getEmployee.execute("CC", "123456")).thenReturn(EMPLOYEE);
+        Document document = Document.of("CC", "123456");
+        when(getEmployee.execute(document)).thenReturn(EMPLOYEE);
         when(updateEmployee.execute(any())).thenReturn(EMPLOYEE);
         UpdateEmployeeRequest request = new UpdateEmployeeRequest("Ana", "Diaz",
             "ana@example.com", "Analyst", EMPLOYEE.hireDate());
@@ -75,9 +77,8 @@ class EmployeeResourceTest {
         assertEquals(200, resource.get("CC", "123456").getStatus());
         assertEquals(200, resource.update("CC", "123456", request).getStatus());
         assertEquals(204, resource.delete("CC", "123456").getStatus());
-        verify(updateEmployee).execute(argThat(command ->
-            command.documentType().equals("CC") && command.documentNumber().equals("123456")));
-        verify(deleteEmployee).execute("CC", "123456");
+        verify(updateEmployee).execute(argThat(command -> command.document().equals(document)));
+        verify(deleteEmployee).execute(document);
     }
 
     @Test
@@ -92,8 +93,7 @@ class EmployeeResourceTest {
             ArgumentCaptor.forClass(UpdateEmployeeCommand.class);
         verify(updateEmployee).execute(captor.capture());
         UpdateEmployeeCommand command = captor.getValue();
-        assertEquals("CC", command.documentType());
-        assertEquals("123456", command.documentNumber());
+        assertEquals(Document.of("CC", "123456"), command.document());
         assertNull(command.firstName());
         assertNull(command.lastName());
         assertNull(command.email());

@@ -24,7 +24,7 @@ public class CreateEmployee {
     }
 
     public EmployeeResult execute(CreateEmployeeCommand command) {
-        Document document = Document.of(command.documentType(), command.documentNumber());
+        Document document = command.document();
         // Check for duplicate email
         if (repository.findByEmail(command.email()).isPresent()) {
             throw new DuplicateEmployeeException("correo");

@@ -3,6 +3,7 @@ package com.assessment.employees.infrastructure.rest.mapper;
 import com.assessment.employees.application.dto.EmployeeResult;
 import com.assessment.employees.application.dto.WorkShiftResult;
 import com.assessment.employees.domain.model.DayType;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.ShiftType;
 import com.assessment.employees.infrastructure.rest.dto.CreateEmployeeRequest;
 import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
@@ -29,9 +30,9 @@ class RestMapperTest {
         EmployeeResult result = new EmployeeResult("CC", "123456", "Ana", "Diaz",
             "ana@example.com", "Analyst", hireDate);
 
-        assertEquals("CC", EmployeeMapper.toCommand(create).documentType());
-        assertEquals("123456", EmployeeMapper.toCommand(create).documentNumber());
-        assertEquals("123456", EmployeeMapper.toCommand("CC", "123456", update).documentNumber());
+        assertEquals("CC", EmployeeMapper.toCommand(create).document().type().name());
+        assertEquals("123456", EmployeeMapper.toCommand(create).document().number());
+        assertEquals("123456", EmployeeMapper.toCommand("CC", "123456", update).document().number());
         assertEquals("CC", EmployeeMapper.toResponse(result).documentType());
     }
 
@@ -48,9 +49,15 @@ class RestMapperTest {
         WorkShiftResult result = new WorkShiftResult(id, date, start, end,
             Duration.ofHours(8), Duration.ofHours(8), Duration.ZERO, DayType.ORDINARIO, ShiftType.DIURNA);
 
-        assertEquals(documentType, WorkShiftMapper.toCommand(documentType, documentNumber, create).documentType());
-        assertEquals(documentNumber, WorkShiftMapper.toCommand(documentType, documentNumber, create).documentNumber());
-        assertEquals(id, WorkShiftMapper.toCommand(id, documentType, documentNumber, update).id());
+        assertEquals(documentType,
+            WorkShiftMapper.toCommand(documentType, documentNumber, create).document().type().name());
+        assertEquals(documentNumber,
+            WorkShiftMapper.toCommand(documentType, documentNumber, create).document().number());
+        assertEquals(id, WorkShiftMapper.toCommand(id, Document.of(documentType, documentNumber),
+            update).id());
+        assertEquals(id, WorkShiftMapper.toShiftId(id.toString()));
+        assertEquals(Document.of(documentType, documentNumber),
+            WorkShiftMapper.toDocument(documentType, documentNumber));
         assertEquals(id, WorkShiftMapper.toResponse(result).id());
         assertEquals(ShiftType.DIURNA.name(), WorkShiftMapper.toResponse(result).shiftType());
         assertEquals(new BigDecimal("8.00"), WorkShiftMapper.toResponse(result).workedHours());

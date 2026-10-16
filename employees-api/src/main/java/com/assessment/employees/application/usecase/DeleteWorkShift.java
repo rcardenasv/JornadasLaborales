@@ -6,6 +6,8 @@ import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
+import java.util.UUID;
+
 
 /**
  * Use case for deleting a work shift.
@@ -20,10 +22,7 @@ public class DeleteWorkShift {
         this.employeeRepository = employeeRepository;
     }
     
-    public void execute(String shiftId, String documentType, String documentNumber) {
-        java.util.UUID id = java.util.UUID.fromString(shiftId);
-        Document document = Document.of(documentType, documentNumber);
-        
+    public void execute(UUID id, Document document) {
         // Check if work shift exists and belongs to employee
         var existing = workShiftRepository.findById(id)
             .orElseThrow(() -> new WorkShiftNotFoundException(id));

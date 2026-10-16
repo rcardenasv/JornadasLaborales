@@ -88,7 +88,7 @@ class WorkShiftResourceTest {
     @Test
     void listParsesFiltersAndReturnsTotalsAndWeeklySummary() {
         WorkShiftResult result = shift();
-        when(list.execute(TYPE, NUMBER, LocalDate.parse("2026-10-01"), null)).thenReturn(
+        when(list.execute(Document.of(TYPE, NUMBER), LocalDate.parse("2026-10-01"), null)).thenReturn(
             new WorkShiftListResult(List.of(result), List.of(
                 new WeeklyWorkloadSummaryResult(LocalDate.of(2026, 9, 28), Duration.ofHours(8),
                     Duration.ofHours(42), Duration.ZERO, Duration.ofHours(34))
@@ -119,14 +119,14 @@ class WorkShiftResourceTest {
     void getUpdateAndDeleteDelegate() {
         WorkShiftResult result = shift();
         String shiftId = result.id().toString();
-        when(get.execute(shiftId, TYPE, NUMBER)).thenReturn(result);
+        when(get.execute(result.id(), Document.of(TYPE, NUMBER))).thenReturn(result);
         when(update.execute(any())).thenReturn(result);
 
         assertEquals(200, resource.get(TYPE, NUMBER, shiftId).getStatus());
         assertEquals(200, resource.update(TYPE, NUMBER, shiftId,
             new UpdateWorkShiftRequest(result.date(), result.startTime(), result.endTime())).getStatus());
         assertEquals(204, resource.delete(TYPE, NUMBER, shiftId).getStatus());
-        verify(delete).execute(shiftId, TYPE, NUMBER);
+        verify(delete).execute(result.id(), Document.of(TYPE, NUMBER));
     }
 
     private CreateWorkShiftRequest request() {

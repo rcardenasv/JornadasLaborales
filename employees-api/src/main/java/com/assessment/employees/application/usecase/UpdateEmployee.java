@@ -20,7 +20,7 @@ public class UpdateEmployee {
     }
     
     public EmployeeResult execute(UpdateEmployeeCommand command) {
-        Document document = Document.of(command.documentType(), command.documentNumber());
+        Document document = command.document();
         Employee existing = repository.findByDocument(document)
             .orElseThrow(() -> new EmployeeNotFoundException(document));
         validateAtLeastOneField(command);

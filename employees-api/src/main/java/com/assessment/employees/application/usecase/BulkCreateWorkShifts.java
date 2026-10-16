@@ -36,7 +36,7 @@ public class BulkCreateWorkShifts {
     public BulkCreateWorkShiftsResult execute(BulkCreateWorkShiftsCommand command) {
         validateRange(command.from(), command.to());
         Set<DayOfWeek> weekdays = weekdays(command.weekdays());
-        Document document = Document.of(command.documentType(), command.documentNumber());
+        Document document = command.document();
         if (employeeRepository.findByDocument(document).isEmpty()) {
             throw new EmployeeNotFoundException(document);
         }

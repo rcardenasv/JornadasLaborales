@@ -23,7 +23,7 @@ public class CreateWorkShift {
     }
 
     public WorkShiftResult execute(CreateWorkShiftCommand command) {
-        Document document = Document.of(command.documentType(), command.documentNumber());
+        Document document = command.document();
         if (employeeRepository.findByDocument(document).isEmpty()) {
             throw new EmployeeNotFoundException(document);
         }
