@@ -227,14 +227,33 @@ La ejecución integral del Frente 3 terminó correctamente: `verify` ejecutó **
 ### Capas y dependencias
 
 ```mermaid
-flowchart LR
-    REST[REST / persistencia / configuración] --> APP[Casos de uso y DTOs]
-    APP --> DOMAIN[Modelo, reglas y puertos]
-    DB[(PostgreSQL)] <--> ADAPTER[Adaptadores JPA]
-    ADAPTER --> DOMAIN
+flowchart TB
+    subgraph infra["infrastructure — adapta HTTP, JPA y Quarkus"]
+        RES["REST delgado<br/>EmployeeResource · WorkShiftResource<br/>DTOs con Bean Validation · mappers manuales<br/>GlobalExceptionHandler → problem+json"]
+        ADAPTER["Adaptadores JPA<br/>EmployeeJpaRepository · WorkShiftJpaRepository<br/>implementan los puertos del dominio"]
+        CONFIG["config · UseCaseConfig<br/>produce los casos de uso como beans CDI"]
+    end
+
+    subgraph app["application — Java puro, sin anotaciones de framework"]
+        UC["Casos de uso: una clase por intención, método execute<br/>empleados: CreateEmployee · GetEmployee · ListEmployees · UpdateEmployee · DeleteEmployee<br/>jornadas: CreateWorkShift · GetWorkShift · ListEmployeeWorkShifts · UpdateWorkShift · DeleteWorkShift · BulkCreateWorkShifts"]
+    end
+
+    subgraph dom["domain — Java puro, reglas de negocio"]
+        PORT["Puertos (interfaces)<br/>EmployeeRepository · WorkShiftRepository"]
+        MODEL["Modelo<br/>Employee · Document · Email · WorkShift"]
+        RULES["Reglas Colombia por vigencia<br/>ColombianHolidayCalendar (festivos) · DayType · ShiftType<br/>DayNightPolicy (ventana diurna/nocturna) · WeeklyWorkloadPolicy (límite + extra)"]
+    end
+
+    DB[("PostgreSQL + Flyway V1–V5")]
+
+    RES -->|"traduce HTTP ⇄ command/result y llama execute()"| UC
+    UC -->|"solo contratos del dominio"| PORT
+    ADAPTER -.->|"implementan"| PORT
+    ADAPTER <--> DB
+    CONFIG -.->|"inyecta en recursos"| RES
 ```
 
-La dirección de dependencias del código apunta hacia el dominio. Los puertos de repositorio viven en `domain`; REST y persistencia los implementan o consumen desde infraestructura.
+La dirección de dependencias del código apunta hacia el dominio: `application` solo conoce los puertos (`domain`); es la persistencia quien los implementa (flecha discontinua = inversión de dependencias). `UseCaseConfig` registra los casos de uso como beans CDI para que `application` permanezca libre de anotaciones; la asignación por constructor permite probar cada clase con Mockito sin Quarkus.
 
 ### Secuencia: crear empleado
 
@@ -312,17 +331,20 @@ erDiagram
 
 ```text
 com.assessment.employees
-|-- domain                         # modelo puro, excepciones y puertos
-|   |-- model                      # Employee, WorkShift y value objects
-|   |-- repository                 # interfaces de repositorio
-|   `-- exception                  # errores de dominio
-|-- application                    # orquestación sin anotaciones de framework
-|   |-- dto                        # comandos y resultados
-|   `-- usecase                    # una clase por intención
-`-- infrastructure                # adaptadores y detalles de framework
-    |-- config                     # productores CDI
-    |-- persistence                # entidades JPA, mappers y repositorios
-    `-- rest                       # recursos, DTOs, mappers y errores HTTP
+|-- domain                          # Java puro: reglas, contratos y excepciones
+|   |-- model                       # Employee, Document, Email, WorkShift
+|   |                               #   + reglas Colombia: ColombianHolidayCalendar,
+|   |                               #   DayType/ShiftType, DayNightPolicy y
+|   |                               #   WeeklyWorkloadPolicy (vigencias legales)
+|   |-- repository                  # puertos: EmployeeRepository, WorkShiftRepository
+|   `-- exception                   # excepciones de dominio (sin HTTP)
+|-- application                     # orquestación sin anotaciones de framework
+|   |-- dto                         # comandos y resultados (records)
+|   `-- usecase                     # una clase por intención (método execute)
+`-- infrastructure                  # detalles de framework
+    |-- config                      # UseCaseConfig: productores CDI de casos de uso
+    |-- persistence                 # entidades JPA, mappers y adaptadores de puertos
+    `-- rest                        # resources, DTOs, mappers, GlobalExceptionHandler
 ```
 
 Decisiones relevantes:
