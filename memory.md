@@ -62,5 +62,4 @@
 1. Si se importa otra copia de la base legada, confirmar manualmente el tipo real de los documentos alfanumericos y agregar sus mapeos explicitos antes de V3; no asumir que son pasaportes.
 2. Cobertura HTTP de los once endpoints y sus errores: IT pendientes, ronda posterior al Frente 3.
 3. Dev Services no tiene evidencia de ejecucion exitosa en este entorno.
-4. El usuario debe confirmar que las respuestas de uso de IA en README reflejan su experiencia personal (incluida la fila (5) del Frente 3).
-5. Revisar el checklist de AGENTS.md seccion 14: marcar Frente 3, V5, README y verify post-Frente 3 como completados.
+4. El usuario debe confirmar que las respuestas de uso de IA en README reflejan su experiencia personal (incluida la fila (5) del Frente 3) y poder sustentar las decisiones ante el evaluador.
