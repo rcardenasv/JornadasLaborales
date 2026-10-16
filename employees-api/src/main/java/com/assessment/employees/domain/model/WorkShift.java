@@ -9,9 +9,6 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.UUID;
 
 public class WorkShift {
-    private static final LocalTime DAYTIME_START = LocalTime.of(6, 0);
-    private static final LocalTime DAYTIME_END = LocalTime.of(21, 0);
-
     private UUID id;
     private Document employeeDocument;
     private Date date;
@@ -100,13 +97,15 @@ public class WorkShift {
     }
 
     private Duration calculateDaytimeHours() {
+        LocalTime daytimeStart = DayNightPolicy.daytimeStart(date.value());
+        LocalTime daytimeEnd = DayNightPolicy.daytimeEnd(date.value());
         Duration daytime = Duration.ZERO;
         for (LocalDate currentDate = date.value();
              !currentDate.isAfter(getEndDate());
              currentDate = currentDate.plusDays(1)) {
-            LocalDateTime daytimeStart = currentDate.atTime(DAYTIME_START);
-            LocalDateTime daytimeEnd = currentDate.atTime(DAYTIME_END);
-            daytime = daytime.plus(getWorkedHoursWithin(daytimeStart, daytimeEnd));
+            LocalDateTime daytimeStartDateTime = currentDate.atTime(daytimeStart);
+            LocalDateTime daytimeEndDateTime = currentDate.atTime(daytimeEnd);
+            daytime = daytime.plus(getWorkedHoursWithin(daytimeStartDateTime, daytimeEndDateTime));
         }
         return daytime;
     }

@@ -30,7 +30,31 @@ class WeeklyWorkloadPolicyTest {
     }
 
     @Test
-    void shouldAcceptExactlyFortyTwoHoursPerIsoWeek() {
+    void shouldUseWeeklyLimitEffectiveOnTheWeekSunday() {
+        assertEquals(Duration.ofHours(47),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2024, 1, 15)));
+        assertEquals(Duration.ofHours(47),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2024, 7, 8)));
+        assertEquals(Duration.ofHours(46),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2024, 7, 15)));
+        assertEquals(Duration.ofHours(44),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2025, 7, 14)));
+        assertEquals(Duration.ofHours(42),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2026, 7, 13)));
+        assertEquals(Duration.ofHours(42),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2026, 10, 12)));
+    }
+
+    @Test
+    void shouldApplyFortyEightHourLimitBeforeReduction() {
+        assertEquals(Duration.ofHours(48),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2023, 6, 19)));
+        assertEquals(Duration.ofHours(47),
+            WeeklyWorkloadPolicy.ordinaryLimitHours(LocalDate.of(2023, 7, 17)));
+    }
+
+    @Test
+    void shouldAcceptWeeklyHoursWithinOrdinaryLimitPlusOvertimeCap() {
         List<WorkShift> shifts = weekdayShifts(8);
         shifts.add(createShift(
             LocalDate.of(2026, 10, 18),
@@ -45,13 +69,33 @@ class WeeklyWorkloadPolicyTest {
     }
 
     @Test
-    void shouldRejectMoreThanFortyTwoHoursPerIsoWeek() {
+    void shouldAllowFortySixScheduledHoursInTwentyTwentySixAsFourOvertime() {
         List<WorkShift> shifts = weekdayShifts(8);
-        shifts.add(createShift(
-            LocalDate.of(2026, 10, 18),
-            LocalTime.of(21, 0),
-            LocalTime.MIDNIGHT
-        ));
+        shifts.add(createShift(LocalDate.of(2026, 10, 17), LocalTime.of(9, 0), LocalTime.of(15, 0)));
+
+        WeeklyWorkloadPolicy.validate(shifts);
+
+        weekTotal(shifts, LocalDate.of(2026, 10, 12), Duration.ofHours(46));
+        assertEquals(Duration.ofHours(4), WeeklyWorkloadPolicy.overtimeHours(
+            Duration.ofHours(46), LocalDate.of(2026, 10, 12)));
+        assertEquals(Duration.ZERO, WeeklyWorkloadPolicy.remainingOrdinaryHours(
+            Duration.ofHours(46), LocalDate.of(2026, 10, 12)));
+    }
+
+    @Test
+    void shouldAcceptExactlyTwelveOvertimeHoursPerIsoWeek() {
+        List<WorkShift> shifts = weekdayShifts(10);
+        shifts.add(createShift(LocalDate.of(2026, 10, 17), LocalTime.of(8, 0), LocalTime.of(12, 0)));
+
+        WeeklyWorkloadPolicy.validate(shifts);
+
+        weekTotal(shifts, LocalDate.of(2026, 10, 12), Duration.ofHours(54));
+    }
+
+    @Test
+    void shouldRejectWeeksExceedingOvertimeCap() {
+        List<WorkShift> shifts = weekdayShifts(10);
+        shifts.add(createShift(LocalDate.of(2026, 10, 17), LocalTime.of(8, 0), LocalTime.of(13, 0)));
 
         WeeklyHoursExceededException exception = assertThrows(
             WeeklyHoursExceededException.class,
@@ -59,7 +103,21 @@ class WeeklyWorkloadPolicyTest {
         );
 
         assertEquals(LocalDate.of(2026, 10, 12), exception.getWeekStart());
-        assertEquals(Duration.ofHours(43), exception.getScheduledHours());
+        assertEquals(Duration.ofHours(55), exception.getScheduledHours());
+        assertEquals(Duration.ofHours(54), exception.getMaxAllowedHours());
+    }
+
+    @Test
+    void shouldRejectAdditionsOnlyWhenOvertimeCapIsExceeded() {
+        List<WorkShift> existing = weekdayShifts(10);
+        List<WorkShift> additions = List.of(
+            createShift(LocalDate.of(2026, 10, 17), LocalTime.of(8, 0), LocalTime.of(12, 0)));
+
+        WeeklyWorkloadPolicy.validateAdditions(existing, additions);
+    }
+
+    private static void weekTotal(List<WorkShift> shifts, LocalDate weekStart, Duration expected) {
+        assertEquals(expected, WeeklyWorkloadPolicy.weeklyHours(shifts).get(weekStart));
     }
 
     private static List<WorkShift> weekdayShifts(int hoursPerDay) {

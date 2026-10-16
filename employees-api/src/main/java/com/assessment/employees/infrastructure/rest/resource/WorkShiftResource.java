@@ -10,7 +10,7 @@ import com.assessment.employees.application.usecase.DeleteWorkShift;
 import com.assessment.employees.application.usecase.GetWorkShift;
 import com.assessment.employees.application.usecase.ListEmployeeWorkShifts;
 import com.assessment.employees.application.usecase.UpdateWorkShift;
-import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
+import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.infrastructure.rest.dto.CreateWorkShiftRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsRequest;
 import com.assessment.employees.infrastructure.rest.dto.BulkCreateWorkShiftsResponse;
@@ -152,16 +152,14 @@ public class WorkShiftResource {
             listResult.weeklySummaries().stream().map(summary -> {
                 LocalDate weekStart = summary.weekStart();
                 WeekFields iso = WeekFields.ISO;
-                Duration remainingHours = WeeklyWorkloadPolicy.MAX_WEEKLY_HOURS
-                    .minus(summary.scheduledHours());
                 return new WeeklySummaryResponse(
                     "%d-W%02d".formatted(weekStart.get(iso.weekBasedYear()),
                         weekStart.get(iso.weekOfWeekBasedYear())),
                     weekStart,
                     weekStart.plusDays(6),
                     summary.scheduledHours(),
-                    WeeklyWorkloadPolicy.MAX_WEEKLY_HOURS,
-                    remainingHours.isNegative() ? Duration.ZERO : remainingHours
+                    summary.ordinaryLimitHours(),
+                    summary.remainingOrdinaryHours()
                 );
             }).toList()
         )).build();

@@ -89,7 +89,8 @@ class WorkShiftResourceTest {
         WorkShiftResult result = shift();
         when(list.execute(TYPE, NUMBER, LocalDate.parse("2026-10-01"), null)).thenReturn(
             new WorkShiftListResult(List.of(result), List.of(
-                new WeeklyWorkloadSummaryResult(LocalDate.of(2026, 9, 28), Duration.ofHours(8))
+                new WeeklyWorkloadSummaryResult(LocalDate.of(2026, 9, 28), Duration.ofHours(8),
+                    Duration.ofHours(42), Duration.ZERO, Duration.ofHours(34))
             ))
         );
 

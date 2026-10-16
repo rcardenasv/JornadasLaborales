@@ -39,7 +39,7 @@ class WorkShiftTest {
         );
         WorkShift mixed = WorkShift.create(
             employeeId,
-            LocalDate.of(2026, 10, 16),
+            LocalDate.of(2025, 12, 24),
             LocalTime.of(5, 0),
             LocalTime.of(23, 0)
         );
@@ -51,6 +51,41 @@ class WorkShiftTest {
         assertEquals(Duration.ofHours(15), mixed.getDaytimeHours());
         assertEquals(Duration.ofHours(3), mixed.getNighttimeHours());
         assertEquals(ShiftType.MIXTA, mixed.getShiftType());
+    }
+
+    @Test
+    void shouldSplitDayAndNightHoursUsingWindowEffectiveAtStartDate() {
+        Document employeeId = Document.of("CC", "123456");
+        WorkShift beforeLawChange = WorkShift.create(
+            employeeId,
+            LocalDate.of(2025, 12, 24),
+            LocalTime.of(18, 0),
+            LocalTime.of(22, 0)
+        );
+        WorkShift onLawChange = WorkShift.create(
+            employeeId,
+            LocalDate.of(2025, 12, 25),
+            LocalTime.of(18, 0),
+            LocalTime.of(22, 0)
+        );
+
+        assertEquals(Duration.ofHours(3), beforeLawChange.getDaytimeHours());
+        assertEquals(Duration.ofHours(1), beforeLawChange.getNighttimeHours());
+        assertEquals(Duration.ofHours(1), onLawChange.getDaytimeHours());
+        assertEquals(Duration.ofHours(3), onLawChange.getNighttimeHours());
+    }
+
+    @Test
+    void shouldApplyStartDateWindowToShiftsCrossingMidnight() {
+        WorkShift overnight = WorkShift.create(
+            Document.of("CC", "123456"),
+            LocalDate.of(2025, 12, 25),
+            LocalTime.of(18, 0),
+            LocalTime.of(2, 0)
+        );
+
+        assertEquals(Duration.ofHours(1), overnight.getDaytimeHours());
+        assertEquals(Duration.ofHours(7), overnight.getNighttimeHours());
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.time.temporal.TemporalAdjusters;
@@ -55,9 +56,19 @@ public class ListEmployeeWorkShifts {
             .stream()
             .filter(entry -> from == null || !entry.getKey().isBefore(weekStart(from)))
             .filter(entry -> to == null || !entry.getKey().isAfter(weekStart(to)))
-            .map(entry -> new WeeklyWorkloadSummaryResult(entry.getKey(), entry.getValue()))
+            .map(entry -> toSummary(entry.getKey(), entry.getValue()))
             .toList();
         return new WorkShiftListResult(results, weeklySummaries);
+    }
+
+    private WeeklyWorkloadSummaryResult toSummary(LocalDate weekStart, Duration scheduledHours) {
+        return new WeeklyWorkloadSummaryResult(
+            weekStart,
+            scheduledHours,
+            WeeklyWorkloadPolicy.ordinaryLimitHours(weekStart),
+            WeeklyWorkloadPolicy.overtimeHours(scheduledHours, weekStart),
+            WeeklyWorkloadPolicy.remainingOrdinaryHours(scheduledHours, weekStart)
+        );
     }
 
     private LocalDate weekStart(LocalDate date) {

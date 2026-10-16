@@ -259,7 +259,7 @@ class UseCasesTest {
         WorkShiftBulkConflictException weeklyConflict = assertThrows(WorkShiftBulkConflictException.class,
             () -> useCase.execute(new BulkCreateWorkShiftsCommand(
                 TYPE, NUMBER, monday.plusDays(5), monday.plusDays(5), null,
-                LocalTime.of(9, 0), LocalTime.of(17, 0)
+                LocalTime.of(9, 0), LocalTime.MIDNIGHT
             )));
         assertEquals(List.of(monday.plusDays(5)), weeklyConflict.getConflictDates());
         assertThrows(InvalidDateRangeException.class, () -> useCase.execute(new BulkCreateWorkShiftsCommand(

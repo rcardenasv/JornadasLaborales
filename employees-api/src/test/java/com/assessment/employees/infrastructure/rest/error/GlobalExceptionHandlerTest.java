@@ -26,7 +26,7 @@ class GlobalExceptionHandlerTest {
         assertProblem(handler.toResponse(new WorkShiftOverlapException(LocalDate.now(),
             LocalTime.of(9, 0), LocalTime.of(17, 0))), 409);
         assertProblem(handler.toResponse(new WeeklyHoursExceededException(LocalDate.now(),
-            java.time.Duration.ofHours(43))), 409);
+            java.time.Duration.ofHours(55), java.time.Duration.ofHours(54))), 409);
         assertProblem(handler.toResponse(new WorkShiftBulkConflictException(List.of(LocalDate.now()))), 409);
         assertProblem(handler.toResponse(new InvalidDateRangeException("Rango inválido.")), 400);
         assertProblem(handler.toResponse(new IllegalArgumentException("Entrada inválida.")), 400);
