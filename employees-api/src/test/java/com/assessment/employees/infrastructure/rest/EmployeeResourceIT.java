@@ -148,4 +148,228 @@ class EmployeeResourceIT {
             .body("shifts", hasSize(2));
         RestAssured.given().when().delete(employeeLocation).then().statusCode(204);
     }
+
+    @Test
+    void shouldRejectInvalidAndDuplicateEmployeeCreation() {
+        RestAssured.given()
+            .contentType("application/json")
+            .body("""
+                {
+                  "documentType": "CC",
+                  "documentNumber": "12",
+                  "firstName": "Ana",
+                  "lastName": "Diaz",
+                  "email": "ana@invalid",
+                  "position": "Analyst",
+                  "hireDate": "2020-01-01"
+                }
+                """)
+            .when()
+            .post("/api/v1/employees")
+            .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("title", equalTo("Error de validación"));
+
+        RestAssured.given()
+            .contentType("application/json")
+            .body("""
+                {
+                  "documentType": "XX",
+                  "documentNumber": "123456789",
+                  "firstName": "Ana",
+                  "lastName": "Diaz",
+                  "email": "ana.example@example.com",
+                  "position": "Analyst",
+                  "hireDate": "2020-01-01"
+                }
+                """)
+            .when()
+            .post("/api/v1/employees")
+            .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("title", equalTo("Solicitud inválida"))
+            .body("detail", equalTo("El tipo de documento debe ser CC, CE o PA."));
+
+        String documentNumber = uniqueSuffix();
+        String location = RestAssured.given().contentType("application/json")
+            .body(createEmployeeBody(documentNumber, "dup"))
+            .when().post("/api/v1/employees")
+            .then().statusCode(201).extract().header("Location");
+        try {
+            RestAssured.given()
+                .contentType("application/json")
+                .body(createEmployeeBody(documentNumber, "dup2"))
+                .when()
+                .post("/api/v1/employees")
+                .then()
+                .statusCode(409)
+                .contentType("application/problem+json")
+                .body("title", equalTo("Conflicto"))
+                .body("detail", equalTo("Ya existe un empleado con ese documento."));
+        } finally {
+            RestAssured.given().when().delete(location).then().statusCode(204);
+        }
+    }
+
+    @Test
+    void shouldRejectDuplicateEmailWithDifferentDocument() {
+        String suffix = uniqueSuffix();
+        RestAssured.given().contentType("application/json")
+            .body(createEmployeeBody(suffix, "dup." + suffix))
+            .when().post("/api/v1/employees").then().statusCode(201);
+        try {
+            RestAssured.given()
+                .contentType("application/json")
+                .body("""
+                    {
+                      "documentType": "CE",
+                      "documentNumber": "%s",
+                      "firstName": "Bea",
+                      "lastName": "Lopez",
+                      "email": "dup.%s@example.com",
+                      "position": "Analyst",
+                      "hireDate": "2020-01-01"
+                    }
+                    """.formatted(suffix, suffix))
+                .when()
+                .post("/api/v1/employees")
+                .then()
+                .statusCode(409)
+                .contentType("application/problem+json")
+                .body("detail", equalTo("Ya existe un empleado con ese correo."));
+        } finally {
+            RestAssured.given().when()
+                .delete("/api/v1/employees/CC/" + suffix).then().statusCode(204);
+        }
+    }
+
+    @Test
+    void shouldPaginateEmployeesAndRejectInvalidPagination() {
+        RestAssured.given().when().get("/api/v1/employees?page=0&size=5").then()
+            .statusCode(200)
+            .body("page", equalTo(0))
+            .body("size", equalTo(5));
+
+        RestAssured.given().when().get("/api/v1/employees?page=-1&size=10").then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("title", equalTo("Solicitud inválida"))
+            .body("detail", equalTo("La página o el tamaño solicitado no son válidos."));
+
+        RestAssured.given().when().get("/api/v1/employees?page=0&size=101").then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("title", equalTo("Solicitud inválida"));
+    }
+
+    @Test
+    void shouldReturnErrorsOnGetUpdateAndDeleteEmployee() {
+        String suffix = uniqueSuffix();
+        String location = RestAssured.given()
+            .contentType("application/json")
+            .body(createEmployeeBody(suffix, "ops." + suffix))
+            .when()
+            .post("/api/v1/employees")
+            .then()
+            .statusCode(201)
+            .extract()
+            .header("Location");
+        String otherLocation = RestAssured.given().contentType("application/json")
+            .body(createEmployeeBody(uniqueSuffix(), "other." + suffix))
+            .when()
+            .post("/api/v1/employees")
+            .then()
+            .statusCode(201)
+            .extract()
+            .header("Location");
+
+        try {
+            RestAssured.given().when().get("/api/v1/employees/XX/123456789").then()
+                .statusCode(400)
+                .contentType("application/problem+json")
+                .body("detail", equalTo("El tipo de documento debe ser CC, CE o PA."));
+
+            RestAssured.given().when().get("/api/v1/employees/CC/88888888").then()
+                .statusCode(404)
+                .contentType("application/problem+json")
+                .body("title", equalTo("No encontrado"))
+                .body("detail", equalTo("No se encontró el empleado solicitado."));
+
+            RestAssured.given()
+                .contentType("application/json")
+                .body("{}")
+                .when()
+                .put(location)
+                .then()
+                .statusCode(400)
+                .contentType("application/problem+json")
+                .body("detail", equalTo("Debe enviar al menos un campo a actualizar."));
+
+            RestAssured.given()
+                .contentType("application/json")
+                .body("{\"position\":\"Senior Analyst\",\"hireDate\":\"2010-01-01\"}")
+                .when()
+                .put(location)
+                .then()
+                .statusCode(400)
+                .contentType("application/problem+json")
+                .body("detail", equalTo("La fecha de contratación no se puede modificar."));
+
+            RestAssured.given()
+                .contentType("application/json")
+                .body("{\"position\":\"Senior Analyst\"}")
+                .when()
+                .put(location)
+                .then()
+                .statusCode(200)
+                .body("position", equalTo("Senior Analyst"))
+                .body("documentNumber", equalTo(suffix))
+                .body("email", equalTo("ops." + suffix + "@example.com"));
+
+            RestAssured.given()
+                .contentType("application/json")
+                .body("{\"email\":\"other." + suffix + "@example.com\"}")
+                .when()
+                .put(location)
+                .then()
+                .statusCode(409)
+                .contentType("application/problem+json")
+                .body("detail", equalTo("Ya existe un empleado con ese correo."));
+
+            RestAssured.given()
+                .contentType("application/json")
+                .body("{\"position\":\"Lead\"}")
+                .when()
+                .put("/api/v1/employees/CC/88888888")
+                .then()
+                .statusCode(404);
+
+            RestAssured.given().when().delete("/api/v1/employees/CC/88888888").then()
+                .statusCode(404)
+                .contentType("application/problem+json");
+        } finally {
+            RestAssured.given().when().delete(location).then().statusCode(204);
+            RestAssured.given().when().delete(otherLocation);
+        }
+    }
+
+    private static String uniqueSuffix() {
+        return "%08d".formatted(Math.floorMod(UUID.randomUUID().hashCode(), 100_000_000));
+    }
+
+    private static String createEmployeeBody(String documentNumber, String emailLocalPart) {
+        return """
+            {
+              "documentType": "CC",
+              "documentNumber": "%s",
+              "firstName": "Ana",
+              "lastName": "Diaz",
+              "email": "%s@example.com",
+              "position": "Analyst",
+              "hireDate": "%s"
+            }
+            """.formatted(documentNumber, emailLocalPart, LocalDate.now().minusDays(1));
+    }
 }

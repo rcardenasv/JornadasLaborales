@@ -96,8 +96,12 @@ public class GlobalExceptionHandler implements ExceptionMapper<Throwable> {
         if (!(exception instanceof ConstraintViolationException violationException)) {
             return null;
         }
+        return toValidationProblem(violationException);
+    }
+
+    static Problem toValidationProblem(ConstraintViolationException exception) {
         Map<String, String> errors = new HashMap<>();
-        for (ConstraintViolation<?> violation : violationException.getConstraintViolations()) {
+        for (ConstraintViolation<?> violation : exception.getConstraintViolations()) {
             String path = violation.getPropertyPath().toString();
             errors.put(path, violation.getMessage());
         }
@@ -133,6 +137,11 @@ public class GlobalExceptionHandler implements ExceptionMapper<Throwable> {
     }
 
     private Response respond(Problem problem) {
+        return problemResponse(problem, uriInfo);
+    }
+
+    /** Unifica la serialización problem+json para todos los ExceptionMappers del proyecto. */
+    static Response problemResponse(Problem problem, UriInfo uriInfo) {
         String path = uriInfo == null ? null : uriInfo.getRequestUri().getPath();
         return Response.status(problem.status())
             .type("application/problem+json")
