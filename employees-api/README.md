@@ -179,7 +179,6 @@ curl -i -X DELETE "$BASE_URL/employees/$DOCUMENT_TYPE/$DOCUMENT_NUMBER"
 ```
 
 ## Pruebas y cobertura
-
 Ejecutar pruebas unitarias:
 
 ```powershell
