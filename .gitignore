@@ -41,3 +41,9 @@ desktop.ini
 
 # BlueJ metadata
 *.ctxt
+
+# Local agent-tooling artifacts (kept on disk, not shipped)
+.agents/
+.opencode/
+skills-lock.json
+watch-and-test.ps1
