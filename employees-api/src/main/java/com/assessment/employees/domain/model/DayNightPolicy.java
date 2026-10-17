@@ -18,7 +18,7 @@ public final class DayNightPolicy {
     private DayNightPolicy() {
     }
 
-    public static LocalTime daytimeStart(LocalDate shiftDate) {
+    public static LocalTime daytimeStart() {
         return DAYTIME_START;
     }
 

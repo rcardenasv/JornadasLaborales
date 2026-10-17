@@ -27,67 +27,109 @@ import java.util.Map;
 
 /**
  * Global exception handler for REST API.
+ * Agrupa las respuestas por categoría (404, 409, 400 de dominio, validación,
+ * plataforma e inesperado) manteniendo la precisión de cada mensaje.
  */
 @Provider
 public class GlobalExceptionHandler implements ExceptionMapper<Throwable> {
     private static final Logger LOGGER = Logger.getLogger(GlobalExceptionHandler.class);
 
+    /** Inyección por campo: es la única vía que JAX-RS ofrece para UriInfo en un ExceptionMapper. */
     @Context
     UriInfo uriInfo;
 
     @Override
     public Response toResponse(Throwable exception) {
+        return respond(toProblem(exception));
+    }
+
+    private Problem toProblem(Throwable exception) {
+        Problem mapped = domainProblem(exception);
+        if (mapped == null) {
+            mapped = validationProblem(exception);
+        }
+        if (mapped == null) {
+            mapped = platformProblem(exception);
+        }
+        return mapped != null ? mapped : unexpectedProblem(exception);
+    }
+
+    private Problem domainProblem(Throwable exception) {
+        Problem problem = notFoundProblem(exception);
+        if (problem == null) {
+            problem = conflictProblem(exception);
+        }
+        return problem != null ? problem : badRequestProblem(exception);
+    }
+
+    private Problem notFoundProblem(Throwable exception) {
         if (exception instanceof EmployeeNotFoundException) {
-            return respond(Problem.notFound("No se encontró el empleado solicitado."));
+            return Problem.notFound("No se encontró el empleado solicitado.");
         }
         if (exception instanceof WorkShiftNotFoundException) {
-            return respond(Problem.notFound("No se encontró la jornada laboral solicitada."));
+            return Problem.notFound("No se encontró la jornada laboral solicitada.");
         }
-        if (exception instanceof DuplicateEmployeeException) {
-            return respond(Problem.conflict(exception.getMessage()));
+        return null;
+    }
+
+    private Problem conflictProblem(Throwable exception) {
+        if (exception instanceof DuplicateEmployeeException
+                || exception instanceof WorkShiftOverlapException
+                || exception instanceof WeeklyHoursExceededException
+                || exception instanceof WorkShiftBulkConflictException) {
+            return Problem.conflict(exception.getMessage());
         }
+        return null;
+    }
+
+    private Problem badRequestProblem(Throwable exception) {
         if (exception instanceof InvalidEmployeeDataException
                 || exception instanceof InvalidWorkShiftException
+                || exception instanceof InvalidDateRangeException
                 || exception instanceof InvalidPaginationException) {
-            return respond(Problem.badRequest(exception.getMessage()));
+            return Problem.badRequest(exception.getMessage());
         }
-        if (exception instanceof WorkShiftOverlapException) {
-            return respond(Problem.conflict(exception.getMessage()));
+        return null;
+    }
+
+    private Problem validationProblem(Throwable exception) {
+        if (!(exception instanceof ConstraintViolationException violationException)) {
+            return null;
         }
-        if (exception instanceof WeeklyHoursExceededException
-                || exception instanceof WorkShiftBulkConflictException) {
-            return respond(Problem.conflict(exception.getMessage()));
+        Map<String, String> errors = new HashMap<>();
+        for (ConstraintViolation<?> violation : violationException.getConstraintViolations()) {
+            String path = violation.getPropertyPath().toString();
+            errors.put(path, violation.getMessage());
         }
-        if (exception instanceof InvalidDateRangeException) {
-            return respond(Problem.badRequest(exception.getMessage()));
-        }
-        if (exception instanceof ConstraintViolationException) {
-            Map<String, String> errors = new HashMap<>();
-            for (ConstraintViolation<?> violation : ((ConstraintViolationException) exception).getConstraintViolations()) {
-                String path = violation.getPropertyPath().toString();
-                errors.put(path, violation.getMessage());
-            }
-            return respond(Problem.validationError("La solicitud contiene datos inválidos.", errors));
-        }
+        return Problem.validationError("La solicitud contiene datos inválidos.", errors);
+    }
+
+    private Problem platformProblem(Throwable exception) {
         if (exception instanceof IllegalArgumentException || exception instanceof DateTimeException
                 || exception instanceof BadRequestException) {
-            return respond(Problem.badRequest(exception.getMessage() == null
-                ? "La solicitud contiene datos inválidos." : exception.getMessage()));
+            return Problem.badRequest(exception.getMessage() == null
+                ? "La solicitud contiene datos inválidos." : exception.getMessage());
         }
         if (exception instanceof WebApplicationException webException) {
-            int status = webException.getResponse().getStatus();
-            if (status >= 500) {
-                LOGGER.errorf("Unexpected REST exception: %s", exception.getClass().getName());
-                return respond(Problem.internalError("Ocurrió un error inesperado."));
-            }
-            Problem problem = status == 404
-                ? Problem.notFound("No se encontró el recurso solicitado.")
-                : Problem.badRequest("La solicitud no pudo ser procesada.");
-            return respond(problem);
+            return webApplicationProblem(webException);
         }
+        return null;
+    }
 
+    private Problem webApplicationProblem(WebApplicationException exception) {
+        int status = exception.getResponse().getStatus();
+        if (status >= 500) {
+            LOGGER.errorf("Unexpected REST exception: %s", exception.getClass().getName());
+            return Problem.internalError("Ocurrió un error inesperado.");
+        }
+        return status == 404
+            ? Problem.notFound("No se encontró el recurso solicitado.")
+            : Problem.badRequest("La solicitud no pudo ser procesada.");
+    }
+
+    private Problem unexpectedProblem(Throwable exception) {
         LOGGER.errorf("Unexpected REST exception: %s", exception.getClass().getName());
-        return respond(Problem.internalError("Ocurrió un error inesperado."));
+        return Problem.internalError("Ocurrió un error inesperado.");
     }
 
     private Response respond(Problem problem) {

@@ -3,7 +3,6 @@ package com.assessment.employees.application.usecase;
 import com.assessment.employees.application.dto.BulkCreateWorkShiftsCommand;
 import com.assessment.employees.application.dto.BulkCreateWorkShiftsResult;
 import com.assessment.employees.application.dto.WorkShiftResult;
-import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.exception.InvalidDateRangeException;
 import com.assessment.employees.domain.exception.WorkShiftBulkConflictException;
 import com.assessment.employees.domain.model.Document;
@@ -25,28 +24,26 @@ public class BulkCreateWorkShifts {
     private static final long MAX_RANGE_DAYS = 92;
 
     private final WorkShiftRepository workShiftRepository;
-    private final EmployeeRepository employeeRepository;
+    private final EmployeeWorkShiftQueries queries;
 
     public BulkCreateWorkShifts(WorkShiftRepository workShiftRepository,
                                 EmployeeRepository employeeRepository) {
         this.workShiftRepository = workShiftRepository;
-        this.employeeRepository = employeeRepository;
+        this.queries = new EmployeeWorkShiftQueries(employeeRepository, workShiftRepository);
     }
 
     public BulkCreateWorkShiftsResult execute(BulkCreateWorkShiftsCommand command) {
         validateRange(command.from(), command.to());
         Set<DayOfWeek> weekdays = weekdays(command.weekdays());
         Document document = command.document();
-        if (employeeRepository.findByDocument(document).isEmpty()) {
-            throw new EmployeeNotFoundException(document);
-        }
+        queries.requireExistingEmployee(document);
 
         List<WorkShift> additions = generateShifts(document, command, weekdays);
         if (additions.isEmpty()) {
             throw new InvalidDateRangeException("El rango no genera jornadas para los días seleccionados.");
         }
 
-        List<WorkShift> existing = findRelevantShifts(document, command.from(), command.to());
+        List<WorkShift> existing = queries.shiftsBetweenWeeksOf(document, command.from(), command.to());
         Set<LocalDate> conflicts = findOverlaps(existing, additions);
         conflicts.addAll(weeklyConflicts(existing, additions));
         if (!conflicts.isEmpty()) {
@@ -86,14 +83,6 @@ public class BulkCreateWorkShifts {
             }
         }
         return shifts;
-    }
-
-    private List<WorkShift> findRelevantShifts(Document document, LocalDate from, LocalDate to) {
-        LocalDate firstWeek = WorkShift.weekStartOf(from);
-        LocalDate lastWeek = WorkShift.weekStartOf(to);
-        return workShiftRepository.findByEmployeeDocumentAndDateRange(
-            document, firstWeek.minusDays(1), lastWeek.plusWeeks(1).plusDays(6)
-        );
     }
 
     private Set<LocalDate> findOverlaps(List<WorkShift> existing, List<WorkShift> additions) {

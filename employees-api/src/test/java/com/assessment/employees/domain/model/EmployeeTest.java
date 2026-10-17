@@ -55,7 +55,7 @@ class EmployeeTest {
     }
 
     @Test
-    void shouldKeepDocumentAndHireDateImmutableOnUpdate() {
+    void shouldUpdateOnlyEditableFieldsAndKeepIdentityAndHireDate() {
         LocalDate hireDate = LocalDate.of(2020, 1, 1);
         Employee employee = Employee.create(
             Document.of("CE", "12345"),
@@ -67,14 +67,12 @@ class EmployeeTest {
             TODAY
         );
 
-        assertThrows(InvalidEmployeeDataException.class, () -> employee.update(
-            "12346", "Ana", "Diaz", "ana@example.com", "Analyst", hireDate
-        ));
-        assertThrows(InvalidEmployeeDataException.class, () -> employee.update(
-            "12345", "Ana", "Diaz", "ana@example.com", "Analyst", hireDate.plusDays(1)
-        ));
-        employee.update("12345", "Ana", "Diaz", "ana@example.com", "Senior Analyst", hireDate);
+        // La actualización parcial solo expone campos editables: documento,
+        // tipo y hireDate no son argumentos y quedan intactos.
+        employee.update(null, null, null, "Senior Analyst");
 
+        assertEquals("CE", employee.getDocumentType().name());
+        assertEquals("12345", employee.getDocumentNumber());
         assertEquals(hireDate, employee.getHireDate());
         assertEquals("Senior Analyst", employee.getPosition());
     }

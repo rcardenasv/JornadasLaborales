@@ -90,17 +90,6 @@ public class Employee {
         }
     }
 
-    public void update(String documentNumber, String firstName, String lastName,
-                       String email, String position, LocalDate requestedHireDate) {
-        if (!document.number().equals(documentNumber)) {
-            throw new InvalidEmployeeDataException("El documento del empleado no se puede modificar.");
-        }
-        if (!hireDate.equals(requestedHireDate)) {
-            throw new InvalidEmployeeDataException("La fecha de contratación no se puede modificar.");
-        }
-        update(firstName, lastName, email, position);
-    }
-
     private void validateEditableFields(String firstName, String lastName,
                                         String email, String position) {
         if (firstName != null) {

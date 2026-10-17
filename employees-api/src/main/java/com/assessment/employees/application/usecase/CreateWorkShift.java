@@ -2,45 +2,34 @@ package com.assessment.employees.application.usecase;
 
 import com.assessment.employees.application.dto.CreateWorkShiftCommand;
 import com.assessment.employees.application.dto.WorkShiftResult;
-import com.assessment.employees.domain.exception.EmployeeNotFoundException;
 import com.assessment.employees.domain.model.Document;
 import com.assessment.employees.domain.model.WorkShift;
 import com.assessment.employees.domain.model.WeeklyWorkloadPolicy;
 import com.assessment.employees.domain.repository.EmployeeRepository;
 import com.assessment.employees.domain.repository.WorkShiftRepository;
 
-import java.time.LocalDate;
 import java.util.List;
 
 public class CreateWorkShift {
     private final WorkShiftRepository workShiftRepository;
-    private final EmployeeRepository employeeRepository;
+    private final EmployeeWorkShiftQueries queries;
 
     public CreateWorkShift(WorkShiftRepository workShiftRepository,
                            EmployeeRepository employeeRepository) {
         this.workShiftRepository = workShiftRepository;
-        this.employeeRepository = employeeRepository;
+        this.queries = new EmployeeWorkShiftQueries(employeeRepository, workShiftRepository);
     }
 
     public WorkShiftResult execute(CreateWorkShiftCommand command) {
         Document document = command.document();
-        if (employeeRepository.findByDocument(document).isEmpty()) {
-            throw new EmployeeNotFoundException(document);
-        }
+        queries.requireExistingEmployee(document);
 
         WorkShift candidate = WorkShift.create(
             document, command.date(), command.startTime(), command.endTime()
         );
-        List<WorkShift> existing = findRelevantShifts(document, candidate);
+        List<WorkShift> existing = queries.shiftsAroundWeekOf(document, candidate.getDate());
         WorkShift.rejectOverlap(existing, candidate);
         WeeklyWorkloadPolicy.validateAdditions(existing, List.of(candidate));
         return WorkShiftResult.fromDomain(workShiftRepository.save(candidate));
-    }
-
-    List<WorkShift> findRelevantShifts(Document document, WorkShift candidate) {
-        LocalDate weekStart = candidate.getWeekStartDate();
-        return workShiftRepository.findByEmployeeDocumentAndDateRange(
-            document, weekStart.minusDays(1), weekStart.plusWeeks(2)
-        );
     }
 }

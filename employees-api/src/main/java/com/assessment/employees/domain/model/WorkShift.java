@@ -102,7 +102,7 @@ public class WorkShift {
     }
 
     private Duration calculateDaytimeHours() {
-        LocalTime daytimeStart = DayNightPolicy.daytimeStart(date);
+        LocalTime daytimeStart = DayNightPolicy.daytimeStart();
         LocalTime daytimeEnd = DayNightPolicy.daytimeEnd(date);
         Duration daytime = Duration.ZERO;
         for (LocalDate currentDate = date;
