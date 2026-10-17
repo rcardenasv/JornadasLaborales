@@ -414,17 +414,24 @@ Datos de Clientes: Información de usuarios o clientes sin consentimiento previo
 
 ### 5. ¿En qué etapas del ciclo de desarrollo utilizas IA?
 
-En esta sesión utilicé IA durante el análisis y revisión del proyecto, la implementación de correcciones, la ejecución y ajuste de pruebas, y la actualización de la documentación. 
+Integración de IA enfocada en 4 pilares: análisis inicial de código, desarrollo y corrección de bugs, creación/ajuste de suite de pruebas y automatización del despliegue.
 
 ### 6. ¿Qué parte de la solución generada o asistida por IA decidiste modificar o rechazar y por qué?
 
-| Sugerencia de la IA | Decisión | Motivo |
-|---|---|---|
-| Usar UUID como identidad pública del empleado y añadir una ruta de cruce por documento | Rechacé esa propuesta y elegí el documento (tipo + número) como identidad en toda la API | Decidí dejar el UUID como PK técnica interna y no exponerlo en las rutas ni respuestas de empleados. |
-| Crear un endpoint separado para el resumen semanal | Rechacé el endpoint nuevo; añadí `weeklySummaries` al GET de jornadas existente | Decidí mantener un contrato acotado y consultar jornadas, totales y carga semanal en una sola respuesta. |
-| Permitir actualizar `hireDate` con el resto de campos | Rechacé actualizar `hireDate`; es inmutable tras la creación | Decidí conservar la fecha como dato histórico; un PUT con una fecha distinta devuelve `400`. |
-| Diseñar jornadas sin las reglas laborales colombianas | Reemplacé el diseño por la clasificación de días/horas, cruce de medianoche y tope semanal de 42 horas | Decidí aterrizar el modelo a Colombia y cortar la carga por semana ISO, en lugar de limitarme a persistir franjas horarias. |
-| Fijar el tope semanal en 42 h, la ventana nocturna en 21:00 y las duraciones en segundos para cualquier fecha | Lo reemplazó el usuario: vigencias legales por fecha (Ley 2101 de 2021 y Ley 2466 de 2025), horas extra reportadas con tope de 12 h y duraciones en horas decimales | Durante la auditoría el usuario señaló que 42 h no regían en 2024 (47 h), que la ventana nocturna cambió con la Ley 2466 de 2025 y que los segundos crudos no eran legibles; implementé la corrección en vez de parchear encima. |
-| Forzar Testcontainers/docker-java 1.20.4/3.4.0 para corregir Dev Services | Retirado tras comprobarlo | Quarkus 3.8.5 seguía cargando su cliente Docker aislado; el fallback hacia PostgreSQL de Compose pasó el IT. |
-| Usar `Matchers.isEmptyOrNullString()` para verificar `Location` | Reemplazado por aserciones JUnit de presencia y contenido no blanco | El matcher estaba marcado como deprecated; las aserciones JUnit evitan la API obsoleta y verifican explícitamente el encabezado. |
-| Diagnóstico inicial genérico del warning de varargs como un `thenReturn(query)` | Corregido al revisar la línea seleccionada; se encadenaron respuestas de un solo valor en los stubbings afectados | El warning real se originaba en varios valores pasados al varargs de Mockito (`Stream` y `TypedQuery`). El encadenamiento conserva las respuestas secuenciales y elimina la creación del array genérico. |
+### Diseño de API y Reglas de Negocio
+
+| Sugerencia de la IA | Decisión | Justificación / Solución Aplicada |
+| :--- | :---: | :--- |
+| **UUID como ID público** | 🔴 Rechazado | Se mantiene el UUID como PK técnica interna. Se usa tipo + número de documento como identidad pública en la API. |
+| **Endpoint separado para resumen semanal** | 🔴 Rechazado | Se incluyó `weeklySummaries` en el `GET` de jornadas existente para mantener un contrato acotado. |
+| **Permitir actualización de `hireDate`** | 🔴 Rechazado | `hireDate` es inmutable tras la creación. Un `PUT` con fecha distinta retorna `400 Bad Request`. |
+| **Jornadas sin reglas laborales colombianas** | 🔄 Reemplazado | Se integró clasificación de días/horas, cruce de medianoche y corte por semana ISO según la legislación colombiana. |
+| **Fijar tope en 42 h, ventana nocturna a las 21:00 y duración en segundos** | 🔄 Corregido | Se ajustó a vigencias legales variables por fecha (Leyes 2101/2021 y 2466/2025), tope de 12 h extras y duraciones en horas decimales. |
+
+### Infraestructura, Testing y Fixes Técnicos
+
+| Sugerencia de la IA | Decisión | Justificación / Solución Aplicada |
+| :--- | :---: | :--- |
+| **Forzar Testcontainers/docker-java 1.20.4/3.4.0** | 🟡 Retirado | Quarkus 3.8.5 cargaba su cliente aislado. El fallback hacia PostgreSQL de Docker Compose pasó las pruebas de integración (IT). |
+| **Usar `Matchers.isEmptyOrNullString()`** | 🔄 Reemplazado | El matcher estaba deprecated. Se sustituyó por aserciones JUnit de presencia y contenido no blanco sobre el encabezado `Location`. |
+| **Diagnóstico genérico de warning varargs (`thenReturn(query)`)** | 🟢 Corregido | El warning se debía a múltiples valores en varargs de Mockito (`Stream` y `TypedQuery`). Se encadenaron respuestas individuales. |
