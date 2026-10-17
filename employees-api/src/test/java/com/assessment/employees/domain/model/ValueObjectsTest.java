@@ -1,5 +1,6 @@
 package com.assessment.employees.domain.model;
 
+import com.assessment.employees.domain.exception.InvalidEmployeeDataException;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -10,8 +11,10 @@ class ValueObjectsTest {
     @Test
     void emailValidatesInput() {
         assertEquals("ana@example.com", Email.of("ana@example.com").value());
-        assertThrows(IllegalArgumentException.class, () -> Email.of("invalid"));
-        assertThrows(IllegalArgumentException.class, () -> Email.of(" "));
+        assertEquals("El correo electrónico es obligatorio.",
+            assertThrows(InvalidEmployeeDataException.class, () -> Email.of("  ")).getMessage());
+        assertEquals("El correo electrónico no tiene un formato válido.",
+            assertThrows(InvalidEmployeeDataException.class, () -> Email.of("invalid")).getMessage());
     }
 
     @Test
@@ -19,6 +22,8 @@ class ValueObjectsTest {
         UUID value = UUID.randomUUID();
         assertEquals(value, EmployeeId.of(value).value());
         assertNotNull(EmployeeId.random().value());
-        assertThrows(IllegalArgumentException.class, () -> new EmployeeId(null));
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class, () -> new EmployeeId(null));
+        assertEquals("El identificador del empleado es obligatorio.", exception.getMessage());
     }
 }

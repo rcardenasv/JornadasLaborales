@@ -113,11 +113,7 @@ public class Employee {
             requireText(position, "cargo");
         }
         if (email != null) {
-            try {
-                new Email(email);
-            } catch (IllegalArgumentException exception) {
-                throw new InvalidEmployeeDataException("El correo electrónico no tiene un formato válido.");
-            }
+            new Email(email);
         }
     }
 

@@ -105,8 +105,9 @@ class UseCasesTest {
         EmployeePageResult page = useCase.execute(2, 10);
         assertEquals(25L, page.totalItems());
         assertEquals(1, page.items().size());
-        assertThrows(IllegalArgumentException.class, () -> useCase.execute(-1, 10));
-        assertThrows(IllegalArgumentException.class, () -> useCase.execute(Integer.MAX_VALUE, 100));
+        assertThrows(InvalidPaginationException.class, () -> useCase.execute(-1, 10));
+        assertThrows(InvalidPaginationException.class, () -> useCase.execute(0, 101));
+        assertThrows(InvalidPaginationException.class, () -> useCase.execute(Integer.MAX_VALUE, 100));
     }
 
     @Test

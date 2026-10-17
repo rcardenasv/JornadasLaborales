@@ -1,5 +1,7 @@
 package com.assessment.employees.domain.model;
 
+import com.assessment.employees.domain.exception.InvalidEmployeeDataException;
+
 import java.util.regex.Pattern;
 
 /**
@@ -12,10 +14,10 @@ public record Email(String value) {
     
     public Email {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Email cannot be null or blank");
+            throw new InvalidEmployeeDataException("El correo electrónico es obligatorio.");
         }
         if (!EMAIL_PATTERN.matcher(value).matches()) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new InvalidEmployeeDataException("El correo electrónico no tiene un formato válido.");
         }
     }
     
